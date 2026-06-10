@@ -78,6 +78,15 @@ fine for now).
   within 2 cm of physics prediction; defaults unchanged (regression-tested);
   debug readout now shows live config values.
 
+### 2026-06-10 — Session 2: project decisions
+- User granted full git autonomy (commit/push at Claude's judgment, no asking).
+- Monetization direction chosen: free game, never pay-to-win; the main long-term
+  model is the **creator economy** — marketplace cut on creator maps/game types +
+  persistent custom lobby subscriptions ("your server, your rules, always on").
+  Nothing gets built for this until the game has real players.
+- **Repo went public** (user's call — indie game, building in public). No license
+  granted yet (all rights reserved) to keep business options open; README explains.
+
 ### Next session — pick one
 - **A. Shooting range** (recommended): a raycast weapon, crosshair feedback, targets
   that react and respawn. Makes it feel like a *game*.
