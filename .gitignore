@@ -3,3 +3,11 @@
 .AppleDouble
 .LSOverride
 ._*
+
+# dependencies & build output
+node_modules/
+dist/
+
+# local env / scratch
+*.local
+.physics-probe/
