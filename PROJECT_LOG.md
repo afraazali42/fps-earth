@@ -84,8 +84,12 @@ fine for now).
   model is the **creator economy** — marketplace cut on creator maps/game types +
   persistent custom lobby subscriptions ("your server, your rules, always on").
   Nothing gets built for this until the game has real players.
-- **Repo went public** (user's call — indie game, building in public). No license
-  granted yet (all rights reserved) to keep business options open; README explains.
+- **Repo went public** (user's call — indie game, building in public).
+- **Licensed MIT** (user's call, values-driven): the project's goal is to unite
+  people and put labor into gaming in a way that benefits everyone — no
+  gatekeeping, no restrictions on building from this work. Conscious trade-off:
+  anyone may legally reuse or re-host the code; the moat is community and
+  execution, not secrecy.
 
 ### Next session — pick one
 - **A. Shooting range** (recommended): a raycast weapon, crosshair feedback, targets

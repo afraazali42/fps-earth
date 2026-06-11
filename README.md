@@ -57,7 +57,8 @@ Project history, decisions and next steps: see [PROJECT_LOG.md](PROJECT_LOG.md).
 
 ## License
 
-Source-visible while in early development, but **no license is granted yet**
-(all rights reserved). You're welcome to read and learn from the code; please
-don't re-host or redistribute the game. A proper license will be chosen as the
-project matures.
+**MIT** — free for anyone to use, modify, and build on, forever. See [LICENSE](LICENSE).
+
+This project exists to unite people and bring back some of the old magic of
+gaming. Gatekeeping would defeat the point: if you build something on top of
+this work, that's the goal working.
