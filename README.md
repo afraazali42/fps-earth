@@ -16,12 +16,18 @@ jump around a 3D test playground. Built in public; follow the journey in
 ## Run it
 
 ```bash
-npm install   # first time only
-npm run dev
+npm install                      # first time only
+npm --prefix server install      # first time only
+npm run dev:server               # the multiplayer server (terminal 1)
+npm run dev                      # the game (terminal 2)
 ```
 
-Then open the `http://localhost:...` address it prints. (In Claude Code, you can
-also just press ▶ on the **dev** server in the preview panel.)
+Then open the `http://localhost:...` address Vite prints. (In Claude Code, you
+can also just press ▶ on the **dev** server in the preview panel.)
+
+**Multiplayer:** every open tab auto-joins the local lobby — open the game in
+two windows and wave at yourself. If the server isn't running the game quietly
+falls back to single-player. `?server=ws://host:port` joins a remote server.
 
 ## Controls
 
@@ -55,7 +61,10 @@ There's also a `dev.*` API in the browser console for automated testing —
 | [src/weapon.ts](src/weapon.ts) | Hitscan rifle: physics raycasts (cover blocks shots), tracers, recoil |
 | [src/targets.ts](src/targets.ts) | Practice targets: health, hit flash, death + respawn, movers |
 | [src/audio.ts](src/audio.ts) | Procedural sound effects (WebAudio, no asset files) |
+| [src/net.ts](src/net.ts) | Server connection: streams position up, receives all players back |
+| [src/remote.ts](src/remote.ts) | Renders other players as coloured capsules, smoothed between updates |
 | [src/input.ts](src/input.ts) | Keyboard/mouse state, pointer lock |
+| [server/](server/src) | The multiplayer server (Colyseus): lobby room, 20 Hz broadcasts |
 
 Project history, decisions and next steps: see [PROJECT_LOG.md](PROJECT_LOG.md).
 

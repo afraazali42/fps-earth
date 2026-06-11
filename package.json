@@ -6,10 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "npm --prefix server run dev",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@colyseus/sdk": "^0.17.42",
     "@dimforge/rapier3d-compat": "^0.19.3",
     "three": "^0.184.0"
   },

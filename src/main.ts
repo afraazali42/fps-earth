@@ -6,6 +6,8 @@ import { World } from './world';
 import { Weapon } from './weapon';
 import { TargetManager } from './targets';
 import { Sfx } from './audio';
+import { Net } from './net';
+import { RemotePlayers } from './remote';
 import { DEFAULT_CONFIG } from './config';
 
 const PHYSICS_STEP = 1 / 60; // physics runs at a fixed 60 Hz regardless of display refresh rate
@@ -60,6 +62,13 @@ async function main() {
 
   const weapon = new Weapon(world, player, camera, input, config, targets, sfx, ui);
 
+  // multiplayer: ?server=ws://host:port overrides the default local server
+  const serverUrl =
+    new URLSearchParams(location.search).get('server') ?? 'ws://localhost:2567';
+  const net = new Net(serverUrl, player);
+  const remotes = new RemotePlayers(world);
+  net.start();
+
   // audio can only start after a user gesture
   window.addEventListener('click', () => sfx.unlock());
   window.addEventListener('keydown', () => sfx.unlock());
@@ -93,6 +102,8 @@ async function main() {
     targets.fixedUpdate(dt);
     world.physics.step();
     weapon.fixedUpdate(dt); // raycasts run against freshly stepped positions
+    net.fixedUpdate(dt);
+    remotes.fixedUpdate(dt, net.players, net.sessionId);
   };
 
   let lastKills = -1;
@@ -138,7 +149,8 @@ async function main() {
     fpsFrames++;
     fpsTime += dt;
     if (fpsTime >= 0.5) {
-      hud.textContent = `${Math.round(fpsFrames / fpsTime)} fps · fps-earth phase 0`;
+      const online = net.connected ? `${net.players.length} online` : 'offline';
+      hud.textContent = `${Math.round(fpsFrames / fpsTime)} fps · fps-earth phase 1 · ${online}`;
       fpsFrames = 0;
       fpsTime = 0;
     }
@@ -146,7 +158,7 @@ async function main() {
 
   if (import.meta.env.DEV) {
     const { installDevTools } = await import('./dev');
-    window.dev = installDevTools(player, input, config, targets, weapon, {
+    window.dev = installDevTools(player, input, config, targets, weapon, net, remotes, {
       step: stepSimulation,
       render: renderFrame,
     });

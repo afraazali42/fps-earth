@@ -3,6 +3,8 @@ import type { Player } from './player';
 import type { GameConfig } from './config';
 import type { TargetManager } from './targets';
 import type { Weapon } from './weapon';
+import type { Net } from './net';
+import type { RemotePlayers } from './remote';
 
 /**
  * Dev/testing tools — only installed when running `npm run dev`, never in a
@@ -58,6 +60,13 @@ export interface DevTools {
   targets(): ReturnType<TargetManager['snapshot']>;
   kills(): number;
   weaponInfo(): { shotsFired: number; lastShot: Weapon['lastShot'] };
+  net(): {
+    connected: boolean;
+    sessionId: string;
+    playerCount: number;
+    renderedRemotes: number;
+    players: Net['players'];
+  };
 }
 
 declare global {
@@ -72,6 +81,8 @@ export function installDevTools(
   config: GameConfig,
   targetManager: TargetManager,
   weapon: Weapon,
+  netClient: Net,
+  remotes: RemotePlayers,
   sim: { step(dt: number): void; render(): void },
 ): DevTools {
   const held = new Set<string>();
@@ -200,6 +211,16 @@ export function installDevTools(
 
     weaponInfo() {
       return { shotsFired: weapon.shotsFired, lastShot: weapon.lastShot };
+    },
+
+    net() {
+      return {
+        connected: netClient.connected,
+        sessionId: netClient.sessionId,
+        playerCount: netClient.players.length,
+        renderedRemotes: remotes.count,
+        players: netClient.players,
+      };
     },
   };
 

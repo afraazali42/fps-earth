@@ -35,7 +35,18 @@ health-darkening, death + timed respawn, kill counter HUD. Tracers, impact
 sparks, hitmarker (red on kill), simple viewmodel with recoil, procedural
 WebAudio sounds (shot/hit/kill — no asset files).
 
-**Not built yet:** other players, map editor, accounts. That's Phases 1–3.
+**Multiplayer v0 (2026-06-10) — Phase 1 has begun:** a Colyseus game server
+(`server/`, runs with `npm run dev:server`) and the game auto-joining its lobby.
+Every player streams their position at 20 Hz; the server broadcasts everyone to
+everyone; other players appear as coloured capsules (visor shows facing) with
+smoothing between updates. Offline fallback: no server → single-player, quiet
+retry every 5 s. Verified with three simultaneous clients — movement propagated
+across clients exact to the decimal. **Honest caveat:** v0 is client-authoritative
+(clients are trusted about their position) — fine for friends, replaced by
+server-authoritative physics later in Phase 1.
+
+**Not built yet:** shooting each other (PvP damage), public servers, rooms via
+link, map editor, accounts.
 
 ## The plan (agreed 2026-06-09)
 
@@ -110,11 +121,26 @@ WebAudio sounds (shot/hit/kill — no asset files).
 - Cute bug-hunt note: shots "did no damage" at first — the weapon was fine; the
   test was firing through the crate pile. Cover works.
 
+### 2026-06-10 — Session 2 (continued): Phase 1 begins — multiplayer presence
+- Built `server/` (Colyseus 0.17 on Node) with a `lobby` room: receives "move",
+  sanitizes every number (never trust the network), broadcasts all players at
+  20 Hz. Client (`src/net.ts`) auto-joins, streams position at 20 Hz, falls back
+  to single-player if no server. `src/remote.ts` renders others as colour-hashed
+  capsules with shortest-arc yaw smoothing.
+- Gotchas recorded for future sessions: the modern Colyseus client package is
+  **@colyseus/sdk** (colyseus.js is legacy, stuck at 0.16); @colyseus/ws-transport
+  0.17 needs **express** installed as a peer dependency.
+- Verified with three live clients (two Claude-driven tabs + the user's preview
+  panel, which auto-joined the lobby mid-test — surprise third player): late
+  join, leave cleanup, and cross-client movement sync exact to the decimal.
+  Screenshot taken of one player seeing another — the milestone shot.
+- Server runs locally only so far: `npm run dev:server`.
+
 ### Next session — pick one
-- **A. Start Phase 1 netcode** (the big one): Colyseus server skeleton, second
-  player visible as a capsule, shared shooting.
-- **B. Feel & polish pass:** movement acceleration, sprint FOV kick, footsteps,
-  better gun feel — tuned live together in the Chrome tab.
-- **C. Third-person toggle** (the "/TPS" part of the vision).
-- **D. Second weapon + switching** — exercises GameConfig toward per-weapon/class
-  structure (closer to custom game types).
+- **A. PvP combat sync:** shoot each other — networked damage, health, death,
+  respawn. Turns presence into an actual deathmatch.
+- **B. Go public:** deploy the server (Railway/Hetzner), rooms joinable via
+  shareable link — the real "friend joins from their house" moment.
+- **C. Server-authoritative movement** — the anti-cheat foundation; replaces
+  client-trusted positions with server-run physics.
+- **D. Polish:** third-person toggle, name tags, better player models.
