@@ -29,6 +29,7 @@ also just press ▶ on the **dev** server in the preview panel.)
 |---|---|
 | WASD | Move |
 | Mouse | Look |
+| Left click | Shoot |
 | Space | Jump |
 | Shift | Sprint |
 | Esc | Release mouse / menu |
@@ -51,6 +52,9 @@ There's also a `dev.*` API in the browser console for automated testing —
 | [src/main.ts](src/main.ts) | Boots everything; runs the game loop (60 Hz physics, smooth rendering) |
 | [src/world.ts](src/world.ts) | The 3D scene + physics world; `addBox()` builds the map |
 | [src/player.ts](src/player.ts) | First-person movement: capsule physics, camera, jumping |
+| [src/weapon.ts](src/weapon.ts) | Hitscan rifle: physics raycasts (cover blocks shots), tracers, recoil |
+| [src/targets.ts](src/targets.ts) | Practice targets: health, hit flash, death + respawn, movers |
+| [src/audio.ts](src/audio.ts) | Procedural sound effects (WebAudio, no asset files) |
 | [src/input.ts](src/input.ts) | Keyboard/mouse state, pointer lock |
 
 Project history, decisions and next steps: see [PROJECT_LOG.md](PROJECT_LOG.md).

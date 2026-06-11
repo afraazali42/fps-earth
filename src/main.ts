@@ -3,6 +3,9 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { Input } from './input';
 import { Player } from './player';
 import { World } from './world';
+import { Weapon } from './weapon';
+import { TargetManager } from './targets';
+import { Sfx } from './audio';
 import { DEFAULT_CONFIG } from './config';
 
 const PHYSICS_STEP = 1 / 60; // physics runs at a fixed 60 Hz regardless of display refresh rate
@@ -15,6 +18,8 @@ async function main() {
   const overlay = document.querySelector<HTMLDivElement>('#overlay')!;
   const crosshair = document.querySelector<HTMLDivElement>('#crosshair')!;
   const hud = document.querySelector<HTMLDivElement>('#hud')!;
+  const hitmarkerEl = document.querySelector<HTMLDivElement>('#hitmarker')!;
+  const scoreEl = document.querySelector<HTMLDivElement>('#score')!;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -31,11 +36,33 @@ async function main() {
   );
 
   // the live game rules — a future "custom game type" is a saved copy of this
-  const config = { ...DEFAULT_CONFIG };
+  const config = { ...DEFAULT_CONFIG, weapon: { ...DEFAULT_CONFIG.weapon }, targets: { ...DEFAULT_CONFIG.targets } };
 
   const input = new Input(document.body);
   const world = new World(config);
   const player = new Player(world, input, camera, config);
+  const targets = new TargetManager(world, config);
+  const sfx = new Sfx();
+
+  // the camera must be in the scene for its children (the viewmodel) to render
+  world.scene.add(camera);
+
+  // hitmarker: flash on hit, bigger and red on kill
+  let hitmarkerTimer: ReturnType<typeof setTimeout> | undefined;
+  const ui = {
+    hitmarker(kill: boolean) {
+      hitmarkerEl.classList.toggle('kill', kill);
+      hitmarkerEl.classList.add('show');
+      clearTimeout(hitmarkerTimer);
+      hitmarkerTimer = setTimeout(() => hitmarkerEl.classList.remove('show'), 70);
+    },
+  };
+
+  const weapon = new Weapon(world, player, camera, input, config, targets, sfx, ui);
+
+  // audio can only start after a user gesture
+  window.addEventListener('click', () => sfx.unlock());
+  window.addEventListener('keydown', () => sfx.unlock());
 
   // hide the overlay as soon as the player clicks — don't wait for pointer
   // lock, which can fail or be unavailable on some devices
@@ -59,6 +86,31 @@ async function main() {
     camera.updateProjectionMatrix();
   });
 
+  // one fixed simulation tick — the rAF loop drives this, and dev tools can
+  // drive it directly (deterministically) when rAF is throttled
+  const stepSimulation = (dt: number) => {
+    player.fixedUpdate(dt);
+    targets.fixedUpdate(dt);
+    world.physics.step();
+    weapon.fixedUpdate(dt); // raycasts run against freshly stepped positions
+  };
+
+  let lastKills = -1;
+  const syncScore = () => {
+    if (targets.kills !== lastKills) {
+      lastKills = targets.kills;
+      scoreEl.textContent = `⌖ ${targets.kills}`;
+    }
+  };
+
+  // render one frame outside the rAF loop (used by dev.step for screenshots)
+  const renderFrame = () => {
+    player.updateCamera(1);
+    weapon.renderUpdate(0);
+    syncScore();
+    renderer.render(world.scene, camera);
+  };
+
   // main loop: fixed-rate physics, interpolated rendering
   let accumulator = 0;
   let last = performance.now();
@@ -74,13 +126,14 @@ async function main() {
 
     accumulator += dt;
     while (accumulator >= PHYSICS_STEP) {
-      player.fixedUpdate(PHYSICS_STEP);
-      world.physics.step();
+      stepSimulation(PHYSICS_STEP);
       accumulator -= PHYSICS_STEP;
     }
 
     player.updateCamera(accumulator / PHYSICS_STEP);
+    weapon.renderUpdate(dt);
     renderer.render(world.scene, camera);
+    syncScore();
 
     fpsFrames++;
     fpsTime += dt;
@@ -93,7 +146,10 @@ async function main() {
 
   if (import.meta.env.DEV) {
     const { installDevTools } = await import('./dev');
-    window.dev = installDevTools(player, input, config);
+    window.dev = installDevTools(player, input, config, targets, weapon, {
+      step: stepSimulation,
+      render: renderFrame,
+    });
     console.log('[fps-earth] dev tools installed — try dev.state() in the console');
   }
 

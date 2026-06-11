@@ -20,6 +20,14 @@ export class Input {
       this.mouseDX += e.movementX;
       this.mouseDY += e.movementY;
     });
+    // left mouse button is tracked as the virtual key "Mouse0"; only real
+    // clicks made while pointer-locked count (menu clicks must never fire)
+    window.addEventListener('mousedown', (e) => {
+      if (this.pointerLocked && e.button === 0) this.keys.add('Mouse0');
+    });
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 0) this.keys.delete('Mouse0');
+    });
     document.addEventListener('pointerlockchange', () => {
       this.pointerLocked = document.pointerLockElement === this.lockTarget;
       if (!this.pointerLocked) this.keys.clear();

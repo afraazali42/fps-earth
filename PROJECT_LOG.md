@@ -27,7 +27,15 @@ ramps, slides along walls, falls off edges and respawns. Fixed 60 Hz physics wit
 smooth interpolated rendering. ~965 KB over the wire (mostly the physics engine —
 fine for now).
 
-**Not built yet:** shooting, other players, map editor, accounts. That's Phases 1–3.
+**Shooting range added (2026-06-10):** a hitscan rifle (damage/fire-rate/range/
+auto all in GameConfig, live-tunable) firing physics raycasts — cover genuinely
+blocks bullets, the same query a future server will run. Six practice targets
+(three static on posts, two side-to-side movers, one high floater): hit flash,
+health-darkening, death + timed respawn, kill counter HUD. Tracers, impact
+sparks, hitmarker (red on kill), simple viewmodel with recoil, procedural
+WebAudio sounds (shot/hit/kill — no asset files).
+
+**Not built yet:** other players, map editor, accounts. That's Phases 1–3.
 
 ## The plan (agreed 2026-06-09)
 
@@ -91,10 +99,22 @@ fine for now).
   anyone may legally reuse or re-host the code; the moat is community and
   execution, not secrecy.
 
+### 2026-06-10 — Session 2 (continued): shooting range
+- Built the rifle + targets (see "Where things stand"). Everything config-first.
+- Added `dev.step(seconds)` — deterministic simulation advance that works even in
+  throttled background tabs, plus `dev.aimAt/fire/targets/kills/weaponInfo`.
+  Full automated test suite passed: kill pipeline, 2 s respawn, cover blocking
+  (verified twice — the playground's own crates blocked a test shot, exactly as
+  designed), moving-target hits, live damage tuning (100 dmg = one-shot kill).
+  Zero console errors.
+- Cute bug-hunt note: shots "did no damage" at first — the weapon was fine; the
+  test was firing through the crate pile. Cover works.
+
 ### Next session — pick one
-- **A. Shooting range** (recommended): a raycast weapon, crosshair feedback, targets
-  that react and respawn. Makes it feel like a *game*.
-- **B. Movement feel pass:** acceleration curves, coyote time, sprint FOV kick,
-  footstep/jump sounds.
+- **A. Start Phase 1 netcode** (the big one): Colyseus server skeleton, second
+  player visible as a capsule, shared shooting.
+- **B. Feel & polish pass:** movement acceleration, sprint FOV kick, footsteps,
+  better gun feel — tuned live together in the Chrome tab.
 - **C. Third-person toggle** (the "/TPS" part of the vision).
-- **D. Start Phase 1 netcode:** Colyseus server skeleton, see your friend as a capsule.
+- **D. Second weapon + switching** — exercises GameConfig toward per-weapon/class
+  structure (closer to custom game types).

@@ -133,6 +133,11 @@ export class Player {
     return { x: this.currPos.x, y: this.currPos.y, z: this.currPos.z };
   }
 
+  /** Used to exclude the player's own capsule from weapon raycasts. */
+  get rigidBody(): RAPIER.RigidBody {
+    return this.body;
+  }
+
   get isGrounded(): boolean {
     return this.grounded;
   }

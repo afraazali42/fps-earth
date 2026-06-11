@@ -37,11 +37,29 @@
       position: fixed; left: 12px; bottom: 10px; z-index: 5;
       color: rgba(255, 255, 255, 0.45); font: 12px ui-monospace, monospace;
     }
+
+    #hitmarker {
+      position: fixed; left: 50%; top: 50%; z-index: 6;
+      transform: translate(-50%, -50%);
+      font: 700 26px system-ui, sans-serif; color: #ffffff;
+      opacity: 0; transition: opacity 0.12s ease-out;
+      pointer-events: none; text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+    }
+    #hitmarker.show { opacity: 1; transition: none; }
+    #hitmarker.kill { color: #ff5252; font-size: 30px; }
+
+    #score {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5;
+      color: rgba(255, 255, 255, 0.85); font: 600 18px ui-monospace, monospace;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+    }
   </style>
 </head>
 <body>
   <div id="app"></div>
   <div id="crosshair"></div>
+  <div id="hitmarker">&#10005;</div>
+  <div id="score">&#8982; 0</div>
   <div id="hud"></div>
   <div id="overlay">
     <h1>FPS&#8209;EARTH</h1>

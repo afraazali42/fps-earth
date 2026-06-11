@@ -1,26 +1,36 @@
 import type { Input } from './input';
 import type { Player } from './player';
 import type { GameConfig } from './config';
+import type { TargetManager } from './targets';
+import type { Weapon } from './weapon';
 
 /**
  * Dev/testing tools — only installed when running `npm run dev`, never in a
  * production build. Two audiences:
  *
  * Humans (keyboard):
- *   `  (backtick)  toggle the debug readout (position, angles, grounded)
+ *   `  (backtick)  toggle the debug readout (position, angles, grounded, rules)
  *   K              respawn at the spawn point if you get stuck
  *
  * Automation (browser console / Claude):
  *   dev.state()                     position, view angles, grounded, fall speed
  *   dev.config()                    current game rules (GameConfig)
- *   dev.tune({ gravity: -4 })       change game rules LIVE — custom-game-type preview
+ *   dev.tune({ gravity: -4 })       change game rules LIVE (nested keys merge:
+ *                                   dev.tune({ weapon: { damage: 100 } }) keeps
+ *                                   the other weapon fields)
  *   dev.look(yawDeg, pitchDeg?)     aim the view
+ *   dev.aimAt(x, y, z)              aim the view at a world position
  *   dev.hold('KeyW', 'ShiftLeft')   press keys down until released
  *   dev.release()                   release all (or listed) virtual keys
- *   dev.walk(seconds, ...keys)      hold keys for N seconds (async)
+ *   dev.step(seconds)               advance the simulation instantly (works even
+ *                                   in throttled background tabs) + render once
+ *   dev.walk(seconds, ...keys)      hold keys for N seconds (async, real time)
+ *   dev.fire(seconds?)              hold the trigger for N seconds (default 0.15)
  *   dev.jump()
  *   dev.teleport(x, y, z)
  *   dev.respawn()
+ *   dev.targets()                   positions/health of all practice targets
+ *   dev.kills()                     current kill count
  */
 
 export interface DevState {
@@ -36,12 +46,18 @@ export interface DevTools {
   config(): GameConfig;
   tune(patch: Partial<GameConfig>): GameConfig;
   look(yawDeg: number, pitchDeg?: number): DevState;
+  aimAt(x: number, y: number, z: number): DevState;
   hold(...codes: string[]): DevState;
   release(...codes: string[]): DevState;
+  step(seconds: number): DevState;
   walk(seconds: number, ...codes: string[]): Promise<DevState>;
+  fire(seconds?: number): DevState;
   jump(): DevState;
   teleport(x: number, y: number, z: number): DevState;
   respawn(): DevState;
+  targets(): ReturnType<TargetManager['snapshot']>;
+  kills(): number;
+  weaponInfo(): { shotsFired: number; lastShot: Weapon['lastShot'] };
 }
 
 declare global {
@@ -50,7 +66,14 @@ declare global {
   }
 }
 
-export function installDevTools(player: Player, input: Input, config: GameConfig): DevTools {
+export function installDevTools(
+  player: Player,
+  input: Input,
+  config: GameConfig,
+  targetManager: TargetManager,
+  weapon: Weapon,
+  sim: { step(dt: number): void; render(): void },
+): DevTools {
   const held = new Set<string>();
 
   const state = (): DevState => ({
@@ -84,19 +107,52 @@ export function installDevTools(player: Player, input: Input, config: GameConfig
     release,
 
     config(): GameConfig {
-      return { ...config };
+      return JSON.parse(JSON.stringify(config)) as GameConfig;
     },
 
     /** Mutates the live game rules — the prototype of Halo-style custom game types. */
     tune(patch: Partial<GameConfig>): GameConfig {
-      Object.assign(config, patch);
-      return { ...config };
+      const cfg = config as unknown as Record<string, unknown>;
+      for (const [key, value] of Object.entries(patch)) {
+        const current = cfg[key];
+        if (
+          value !== null &&
+          typeof value === 'object' &&
+          current !== null &&
+          typeof current === 'object'
+        ) {
+          Object.assign(current, value);
+        } else {
+          cfg[key] = value;
+        }
+      }
+      return tools.config();
     },
 
     look(yawDeg: number, pitchDeg = 0): DevState {
       player.yaw = (yawDeg * Math.PI) / 180;
       const limit = 89;
       player.pitch = (Math.max(-limit, Math.min(limit, pitchDeg)) * Math.PI) / 180;
+      return state();
+    },
+
+    /** Point the camera at a world position (from the current eye position). */
+    aimAt(x: number, y: number, z: number): DevState {
+      const eye = player.position;
+      const dx = x - eye.x;
+      const dy = y - (eye.y + 0.75);
+      const dz = z - eye.z;
+      const horizontal = Math.hypot(dx, dz);
+      player.yaw = Math.atan2(-dx, -dz);
+      player.pitch = Math.atan2(dy, horizontal);
+      return state();
+    },
+
+    /** Advance the simulation deterministically, then render one frame. */
+    step(seconds: number): DevState {
+      const ticks = Math.min(1200, Math.max(1, Math.round(seconds * 60)));
+      for (let i = 0; i < ticks; i++) sim.step(1 / 60);
+      sim.render();
       return state();
     },
 
@@ -109,6 +165,13 @@ export function installDevTools(player: Player, input: Input, config: GameConfig
           resolve(state());
         }, seconds * 1000),
       );
+    },
+
+    /** Hold the trigger (virtual left mouse) for a duration. */
+    fire(seconds = 0.15): DevState {
+      hold('Mouse0');
+      setTimeout(() => release('Mouse0'), seconds * 1000);
+      return state();
     },
 
     jump(): DevState {
@@ -125,6 +188,18 @@ export function installDevTools(player: Player, input: Input, config: GameConfig
     respawn(): DevState {
       player.respawn();
       return state();
+    },
+
+    targets() {
+      return targetManager.snapshot();
+    },
+
+    kills(): number {
+      return targetManager.kills;
+    },
+
+    weaponInfo() {
+      return { shotsFired: weapon.shotsFired, lastShot: weapon.lastShot };
     },
   };
 
@@ -145,7 +220,8 @@ export function installDevTools(player: Player, input: Input, config: GameConfig
       `pos  ${s.pos.x.toFixed(1)}  ${s.pos.y.toFixed(1)}  ${s.pos.z.toFixed(1)}\n` +
       `yaw ${s.yawDeg}°  pitch ${s.pitchDeg}°\n` +
       `${s.grounded ? 'grounded' : 'airborne'}  vy ${s.verticalVelocity.toFixed(1)}\n` +
-      `grav ${config.gravity}  walk ${config.walkSpeed}  sprint ${config.sprintSpeed}  jump ${config.jumpVelocity}`;
+      `grav ${config.gravity}  walk ${config.walkSpeed}  sprint ${config.sprintSpeed}  jump ${config.jumpVelocity}\n` +
+      `dmg ${config.weapon.damage}  rof ${config.weapon.fireRate}/s  kills ${targetManager.kills}`;
   }, 100);
 
   window.addEventListener('keydown', (e) => {
