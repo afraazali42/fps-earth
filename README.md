@@ -15,6 +15,12 @@ jump around a 3D test playground. Built in public; follow the journey in
 
 ## Run it
 
+**Easiest — double-click [`play.command`](play.command)** (macOS). It installs
+dependencies on first run, starts the multiplayer server and the game, and opens
+your browser. Keep the Terminal window open while you play; close it to stop.
+
+**Manually:**
+
 ```bash
 npm install                      # first time only
 npm --prefix server install      # first time only
