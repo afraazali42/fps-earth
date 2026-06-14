@@ -13,7 +13,9 @@ shareable file, just like a map.
 sprint, jump and shoot around a 3D playground, with networked deathmatch (health,
 death, respawn, kill/death tally). Multiplayer is **peer-to-peer** — one player
 hosts in their browser and friends join by link; there's no game server to pay
-for. Built in public; follow the journey in [PROJECT_LOG.md](PROJECT_LOG.md).
+for. The host sets the **game rules** — gravity, speeds, jump, damage, fire rate,
+with one-click presets — and they apply to everyone, live. Built in public;
+follow the journey in [PROJECT_LOG.md](PROJECT_LOG.md).
 
 ## Run it
 
@@ -42,6 +44,13 @@ can also just press ▶ on the **dev** server in the preview panel.)
 - The only shared infrastructure is a tiny **matchmaker** (`server/`) that helps
   browsers find each other — it carries no gameplay, so it's basically free to
   run. `?signal=host:port` points the game at a specific matchmaker.
+
+**Game rules (custom games):** the host gets a "Game rules" panel (in the menu,
+and any time via Esc) — gravity, move/sprint speed, jump height, damage, fire
+rate, plus presets like Moon, Snipers, Rapid Fire, Floaty Brawl. Changes apply
+instantly and propagate to everyone in the lobby; peers see the rules read-only.
+This is the Halo-custom-games heart of the project, and it all rides on
+[src/config.ts](src/config.ts) (rules as data).
 
 The host's browser runs the game's authority (health/hits/scores). Trade-offs,
 honest: the host has a latency advantage and could cheat, the game ends if the
@@ -74,7 +83,8 @@ There's also a `dev.*` API in the browser console for automated testing —
 
 | File | What it does |
 |---|---|
-| [src/config.ts](src/config.ts) | **The game rules as data** — gravity, speeds, jump. Future custom game types = saved copies of this |
+| [src/config.ts](src/config.ts) | **The game rules as data** — gravity, speeds, jump, damage. Custom game types = copies of this |
+| [src/settings.ts](src/settings.ts) | The host's "Game rules" panel — sliders + presets that edit the live config |
 | [src/main.ts](src/main.ts) | Boots everything; runs the game loop (60 Hz physics, smooth rendering) |
 | [src/world.ts](src/world.ts) | The 3D scene + physics world; `addBox()` builds the map |
 | [src/player.ts](src/player.ts) | First-person movement: capsule physics, camera, jumping |

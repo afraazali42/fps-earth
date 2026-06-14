@@ -72,6 +72,11 @@ export class PeerHost {
     }
   }
 
+  sendTo(id: string, type: string, data: unknown) {
+    const conn = this.conns.get(id);
+    if (conn && conn.open) conn.send({ t: type, d: data });
+  }
+
   destroy() {
     this.peer.destroy();
   }

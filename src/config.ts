@@ -42,6 +42,37 @@ export interface GameConfig {
   targets: TargetsConfig;
 }
 
+/**
+ * Copy rule values from an untrusted source (e.g. the host, over the network)
+ * into our live config IN PLACE — so every system holding a reference to the
+ * config object picks up the new rules immediately. Only well-typed fields are
+ * copied; anything malformed is ignored.
+ */
+export function applyConfig(target: GameConfig, src: unknown): void {
+  if (typeof src !== 'object' || src === null) return;
+  const s = src as Record<string, unknown>;
+  const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+  if (num(s.gravity)) target.gravity = s.gravity;
+  if (num(s.walkSpeed)) target.walkSpeed = s.walkSpeed;
+  if (num(s.sprintSpeed)) target.sprintSpeed = s.sprintSpeed;
+  if (num(s.jumpVelocity)) target.jumpVelocity = s.jumpVelocity;
+
+  if (typeof s.weapon === 'object' && s.weapon !== null) {
+    const w = s.weapon as Record<string, unknown>;
+    if (num(w.damage)) target.weapon.damage = w.damage;
+    if (num(w.fireRate)) target.weapon.fireRate = w.fireRate;
+    if (num(w.range)) target.weapon.range = w.range;
+    if (typeof w.automatic === 'boolean') target.weapon.automatic = w.automatic;
+  }
+
+  if (typeof s.targets === 'object' && s.targets !== null) {
+    const t = s.targets as Record<string, unknown>;
+    if (num(t.health)) target.targets.health = t.health;
+    if (num(t.respawnSeconds)) target.targets.respawnSeconds = t.respawnSeconds;
+  }
+}
+
 export const DEFAULT_CONFIG: GameConfig = {
   gravity: -24, // stronger than real gravity — snappier jumps feel better
   walkSpeed: 5.5,

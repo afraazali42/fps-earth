@@ -55,8 +55,19 @@ counted), result broadcast back — all with no game server. **Honest caveats:**
 host has a latency edge and is trusted (could cheat); host leaving ends the game;
 ~10–20% of strict home networks will need a TURN relay (not yet provided).
 
+**Custom-game rules (2026-06-14):** the host gets a "Game rules" panel (`src/settings.ts`)
+in the menu — sliders for gravity, move/sprint speed, jump height, damage, fire
+rate, plus one-click presets (Normal, Moon, Snipers, Rapid Fire, Floaty Brawl,
+Speed Demons). The host's rules apply live and propagate to everyone: peers
+receive the config on join and on every change (over the P2P link), apply it into
+their live GameConfig (so all systems pick it up immediately), and see the panel
+read-only. This is the Halo-custom-games soul, riding entirely on the rules-as-data
+foundation. Verified end-to-end: peer inherited host's rules on join (gravity -6,
+move 9, damage 100, fire rate 2) and a mid-game change (gravity -2, damage 7)
+propagated live.
+
 **Not built yet:** a deployed public matchmaker (works locally now), a TURN relay
-for strict networks, map editor, accounts, game-mode/rules UI.
+for strict networks, map editor, accounts.
 
 ## The plan (agreed 2026-06-09)
 
@@ -189,11 +200,26 @@ for strict networks, map editor, accounts, game-mode/rules UI.
   and asserted on the foreground host; the raycast-hit path was already verified
   locally in Session 3, so this session proved the P2P transport + authority.
 
+### 2026-06-14 — Session 5: custom-game rules (the soul)
+- Built `src/settings.ts` (SettingsPanel): host-editable "Game rules" panel with
+  6 sliders (gravity/move/sprint/jump/damage/fire-rate) + 6 presets. Lives in the
+  menu overlay (so it's reachable any time via Esc).
+- Rule propagation over P2P: `applyConfig()` in config.ts merges an incoming
+  ruleset into the live GameConfig in place; net.ts sends config to each peer on
+  join and via `broadcastConfig()` on change; peers apply + refresh the panel
+  read-only. `world.setGravity()` keeps world gravity in sync. New dev helper
+  `dev.broadcastRules(patch)`.
+- Verified end-to-end (host + peer, P2P, no game server): host changed rules →
+  peer joining inherited them (gravity -6, move 9, dmg 100, rof 2); a live change
+  (gravity -2, dmg 7) propagated to the peer; peer panel correctly read-only.
+  Screenshot of the host rules panel (Floaty Brawl preset) taken.
+
 ### Next session — pick one
 - **A. Deploy the matchmaker** (Railway/Hetzner/Fly free-tier) + maybe a TURN
   relay, so a friend can join from their house over the real internet. The
-  "friend from another house" moment. (Works on the same wifi today.)
-- **B. Game modes / custom-rules lobby UI** — host sets gravity, speed, damage,
-  score-to-win before starting (the Halo-custom-games soul, made clickable).
+  "friend from another house" moment. (Works on the same machine/LAN today.)
+- **B. More rules + game modes** — score-to-win / time limit / team play, more
+  weapons or per-class traits (deepens the custom-games vault).
 - **C. Polish:** third-person toggle, name tags, footsteps, nicer player models.
-- **D. Robustness:** host-migration or graceful "host left" handling; reconnect.
+- **D. Robustness:** graceful "host left" handling; reconnect; host migration.
+- **E. Map editor (Phase 2)** — the big differentiator; build & share maps.

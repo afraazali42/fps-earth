@@ -1,6 +1,7 @@
 import type { Player } from './player';
 import { GameHost, type NetPlayerWire } from './host';
 import { PeerHost, PeerClient, type SignalConfig } from './peerlink';
+import { applyConfig, type GameConfig } from './config';
 
 /** One player's state, as the host's authority reports it. */
 export type NetPlayerState = NetPlayerWire;
@@ -14,6 +15,8 @@ export interface NetOptions {
   role: Role;
   hostCode?: string;
   signal: SignalConfig;
+  /** the live game rules — host sends these to peers; peers receive into them */
+  config: GameConfig;
 }
 
 /**
@@ -40,6 +43,8 @@ export class Net {
   onKill: ((killerId: string, victimId: string) => void) | null = null;
   onRespawn: ((id: string, x: number, y: number, z: number) => void) | null = null;
   onStatus: ((status: string) => void) | null = null;
+  /** peer: fired when the host's rules arrive and have been applied to config */
+  onConfig: (() => void) | null = null;
 
   private sendAccumulator = 0;
   private game?: GameHost;
@@ -60,6 +65,11 @@ export class Net {
 
   self(): NetPlayerState | undefined {
     return this.players.find((p) => p.id === this.sessionId);
+  }
+
+  /** Host: push the current rules to everyone (call after changing settings). */
+  broadcastConfig() {
+    this.peerHost?.sendToAll('config', this.opts.config);
   }
 
   /** Tell the authority our shot connected with another player. */
@@ -113,7 +123,10 @@ export class Net {
       this.shareCode = id;
       this.setStatus('hosting');
     };
-    host.onPeerJoin = (id) => game.addPlayer(id);
+    host.onPeerJoin = (id) => {
+      game.addPlayer(id);
+      host.sendTo(id, 'config', this.opts.config); // bring the new player onto our rules
+    };
     host.onPeerLeave = (id) => game.removePlayer(id);
     host.onMessage = (from, type, data) => {
       if (type === 'move') game.applyMove(from, data);
@@ -140,6 +153,9 @@ export class Net {
       } else if (type === 'respawn') {
         const m = data as { id: string; x: number; y: number; z: number };
         this.onRespawn?.(m.id, m.x, m.y, m.z);
+      } else if (type === 'config') {
+        applyConfig(this.opts.config, data);
+        this.onConfig?.();
       }
     };
     client.onClose = () => {

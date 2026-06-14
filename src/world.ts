@@ -30,6 +30,11 @@ export class World {
     this.buildTestMap();
   }
 
+  /** Update world gravity live (used when the host changes the rules). */
+  setGravity(g: number) {
+    this.physics.gravity = new RAPIER.Vector3(0, g, 0);
+  }
+
   /** Adds one solid box to both the visual scene and the physics world. */
   addBox({ size, position, color = 0x8d99ae, rotation }: BoxOptions): THREE.Mesh {
     const [w, h, d] = size;

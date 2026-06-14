@@ -72,6 +72,7 @@ export interface DevTools {
   };
   self(): NetPlayerState | undefined;
   hitPlayer(targetId: string, damage?: number): void;
+  broadcastRules(patch: Partial<GameConfig>): GameConfig;
 }
 
 declare global {
@@ -238,6 +239,13 @@ export function installDevTools(
     /** Report a hit on another player straight to the server (test helper). */
     hitPlayer(targetId: string, damage?: number) {
       netClient.reportHit(targetId, damage ?? config.weapon.damage);
+    },
+
+    /** Change the rules locally and (if host) push them to all peers. */
+    broadcastRules(patch: Partial<GameConfig>) {
+      const updated = tools.tune(patch);
+      netClient.broadcastConfig();
+      return updated;
     },
   };
 

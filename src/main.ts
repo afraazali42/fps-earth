@@ -8,6 +8,7 @@ import { TargetManager } from './targets';
 import { Sfx } from './audio';
 import { Net } from './net';
 import { RemotePlayers } from './remote';
+import { SettingsPanel } from './settings';
 import { DEFAULT_CONFIG } from './config';
 
 const PHYSICS_STEP = 1 / 60; // physics runs at a fixed 60 Hz regardless of display refresh rate
@@ -41,6 +42,7 @@ async function main() {
   const deathEl = document.querySelector<HTMLDivElement>('#death')!;
   const netstatusEl = document.querySelector<HTMLDivElement>('#netstatus')!;
   const inviteEl = document.querySelector<HTMLButtonElement>('#invite')!;
+  const settingsContainerEl = document.querySelector<HTMLDivElement>('#settings')!;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -79,7 +81,7 @@ async function main() {
   const hostCode = params.get('host');
   const role: 'host' | 'peer' = hostCode ? 'peer' : 'host';
   const signal = parseSignal(params.get('signal'));
-  const net = new Net(player, { role, hostCode: hostCode ?? undefined, signal });
+  const net = new Net(player, { role, hostCode: hostCode ?? undefined, signal, config });
   const remotes = new RemotePlayers(world);
 
   const inviteLink = () =>
@@ -105,6 +107,19 @@ async function main() {
     }
   });
   updateNetUI();
+
+  // custom-game rules: the host edits, everyone plays by them
+  const applyRules = () => world.setGravity(config.gravity);
+  const settings = new SettingsPanel(settingsContainerEl, config, () => {
+    applyRules();
+    if (net.role === 'host') net.broadcastConfig();
+  });
+  settings.setEditable(net.role === 'host');
+  net.onConfig = () => {
+    applyRules();
+    settings.refresh();
+  };
+  applyRules();
 
   // hitmarker: flash on hit, bigger and red on kill
   let hitmarkerTimer: ReturnType<typeof setTimeout> | undefined;
