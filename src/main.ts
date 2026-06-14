@@ -12,6 +12,17 @@ import { DEFAULT_CONFIG } from './config';
 
 const PHYSICS_STEP = 1 / 60; // physics runs at a fixed 60 Hz regardless of display refresh rate
 
+/** Where the signaling ("matchmaker") server lives. Defaults to this machine:9000. */
+function parseSignal(raw: string | null) {
+  const secure = location.protocol === 'https:';
+  const fallbackHost = location.hostname || 'localhost';
+  if (raw) {
+    const [h, p] = raw.split(':');
+    return { host: h || fallbackHost, port: p ? Number(p) : 9000, path: '/', secure };
+  }
+  return { host: fallbackHost, port: 9000, path: '/', secure };
+}
+
 async function main() {
   await RAPIER.init();
   console.log('[fps-earth] physics ready');
@@ -28,6 +39,8 @@ async function main() {
   const damageFlashEl = document.querySelector<HTMLDivElement>('#damageflash')!;
   const killfeedEl = document.querySelector<HTMLDivElement>('#killfeed')!;
   const deathEl = document.querySelector<HTMLDivElement>('#death')!;
+  const netstatusEl = document.querySelector<HTMLDivElement>('#netstatus')!;
+  const inviteEl = document.querySelector<HTMLButtonElement>('#invite')!;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -59,11 +72,39 @@ async function main() {
   // the camera must be in the scene for its children (the viewmodel) to render
   world.scene.add(camera);
 
-  // multiplayer: ?server=ws://host:port overrides the default local server
-  const serverUrl =
-    new URLSearchParams(location.search).get('server') ?? 'ws://localhost:2567';
-  const net = new Net(serverUrl, player);
+  // multiplayer roles: open the game plain → you HOST (others join your link);
+  // open it with ?host=CODE → you join that host. ?signal=host:port overrides
+  // where the tiny matchmaker lives (defaults to this machine, port 9000).
+  const params = new URLSearchParams(location.search);
+  const hostCode = params.get('host');
+  const role: 'host' | 'peer' = hostCode ? 'peer' : 'host';
+  const signal = parseSignal(params.get('signal'));
+  const net = new Net(player, { role, hostCode: hostCode ?? undefined, signal });
   const remotes = new RemotePlayers(world);
+
+  const inviteLink = () =>
+    `${location.origin}${location.pathname}?host=${encodeURIComponent(net.shareCode)}`;
+  const updateNetUI = () => {
+    if (net.role === 'host' && net.shareCode) {
+      netstatusEl.innerHTML =
+        `You're the host — friends join with your link:<br><span class="link">${inviteLink()}</span>`;
+      inviteEl.classList.add('show');
+    } else {
+      netstatusEl.textContent = net.status;
+    }
+  };
+  net.onStatus = updateNetUI;
+  inviteEl.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(inviteLink());
+      inviteEl.textContent = '✓ Link copied!';
+      setTimeout(() => (inviteEl.textContent = '📋 Copy invite link'), 1500);
+    } catch {
+      netstatusEl.innerHTML = `Copy this link:<br><span class="link">${inviteLink()}</span>`;
+    }
+  });
+  updateNetUI();
 
   // hitmarker: flash on hit, bigger and red on kill
   let hitmarkerTimer: ReturnType<typeof setTimeout> | undefined;

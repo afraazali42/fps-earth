@@ -9,32 +9,45 @@ rules are **data, not code** — gravity, speeds, and (eventually) classes, dama
 and win conditions are all live-tunable config, and a custom game type will be a
 shareable file, just like a map.
 
-**Current state: Phase 1** — a first-person shooter you can play with others: walk,
+**Current state: Phase 1** — a first-person shooter you play with others: walk,
 sprint, jump and shoot around a 3D playground, with networked deathmatch (health,
-death, respawn, kill/death tally) over a Colyseus server. Built in public; follow
-the journey in [PROJECT_LOG.md](PROJECT_LOG.md).
+death, respawn, kill/death tally). Multiplayer is **peer-to-peer** — one player
+hosts in their browser and friends join by link; there's no game server to pay
+for. Built in public; follow the journey in [PROJECT_LOG.md](PROJECT_LOG.md).
 
 ## Run it
 
 **Easiest — double-click [`play.command`](play.command)** (macOS). It installs
-dependencies on first run, starts the multiplayer server and the game, and opens
-your browser. Keep the Terminal window open while you play; close it to stop.
+dependencies on first run, starts the matchmaker and the game, and opens your
+browser. Keep the Terminal window open while you play; close it to stop.
 
 **Manually:**
 
 ```bash
 npm install                      # first time only
 npm --prefix server install      # first time only
-npm run dev:server               # the multiplayer server (terminal 1)
+npm run dev:server               # the matchmaker / signaling server (terminal 1)
 npm run dev                      # the game (terminal 2)
 ```
 
 Then open the `http://localhost:...` address Vite prints. (In Claude Code, you
 can also just press ▶ on the **dev** server in the preview panel.)
 
-**Multiplayer:** every open tab auto-joins the local lobby — open the game in
-two windows and wave at yourself. If the server isn't running the game quietly
-falls back to single-player. `?server=ws://host:port` joins a remote server.
+## Multiplayer (peer-to-peer)
+
+- Open the game normally → **you're the host**. A shareable invite link appears
+  (and a "Copy invite link" button).
+- A friend opens that link (`?host=CODE`) → their browser connects **directly**
+  to yours over WebRTC and the game plays peer-to-peer.
+- The only shared infrastructure is a tiny **matchmaker** (`server/`) that helps
+  browsers find each other — it carries no gameplay, so it's basically free to
+  run. `?signal=host:port` points the game at a specific matchmaker.
+
+The host's browser runs the game's authority (health/hits/scores). Trade-offs,
+honest: the host has a latency advantage and could cheat, the game ends if the
+host leaves, and a small fraction of restrictive home networks need a relay
+(TURN) server to connect — all acceptable for friends'/community lobbies, like a
+LAN host of old.
 
 ## Controls
 
@@ -68,10 +81,12 @@ There's also a `dev.*` API in the browser console for automated testing —
 | [src/weapon.ts](src/weapon.ts) | Hitscan rifle: physics raycasts (cover blocks shots), tracers, recoil |
 | [src/targets.ts](src/targets.ts) | Practice targets: health, hit flash, death + respawn, movers |
 | [src/audio.ts](src/audio.ts) | Procedural sound effects (WebAudio, no asset files) |
-| [src/net.ts](src/net.ts) | Server connection: streams position up, receives all players back |
-| [src/remote.ts](src/remote.ts) | Renders other players as coloured capsules, smoothed between updates |
+| [src/net.ts](src/net.ts) | Networking: as host runs the authority locally, as peer talks to the host; same API either way |
+| [src/host.ts](src/host.ts) | The game authority (health/hits/respawn/scores) — runs in the host player's browser |
+| [src/peerlink.ts](src/peerlink.ts) | WebRTC peer-to-peer link (PeerJS): host accepts friends, friend connects to host |
+| [src/remote.ts](src/remote.ts) | Renders other players as coloured capsules with hittable colliders, smoothed |
 | [src/input.ts](src/input.ts) | Keyboard/mouse state, pointer lock |
-| [server/](server/src) | The multiplayer server (Colyseus): lobby room, 20 Hz broadcasts |
+| [server/](server/src) | The tiny matchmaker / signaling server (PeerServer) — handshake only, no gameplay |
 
 Project history, decisions and next steps: see [PROJECT_LOG.md](PROJECT_LOG.md).
 

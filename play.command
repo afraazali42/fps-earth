@@ -2,10 +2,11 @@
 #
 # fps-earth — double-click to play locally.
 #
-# Starts the multiplayer server AND the game, then opens your browser.
-# Keep the Terminal window open while you play; close it (or press Ctrl-C)
-# to stop everything. This file is portable — it works from wherever the
-# fps-earth folder lives.
+# Starts the matchmaker (signaling) server AND the game, then opens your browser.
+# When the game opens you're the HOST — share your invite link and friends join
+# you directly (peer-to-peer); there's no game server to pay for. Keep the
+# Terminal window open while you play; close it (or press Ctrl-C) to stop.
+# This file is portable — it works from wherever the fps-earth folder lives.
 
 # Make sure Homebrew-installed node/npm are found when launched by double-click.
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
@@ -36,12 +37,12 @@ if [ ! -d "server/node_modules" ]; then
   npm --prefix server install || { echo "Install failed."; read -n 1 -s -r -p "Press any key to close."; exit 1; }
 fi
 
-# Start the multiplayer server — but reuse one if it's already running.
+# Start the matchmaker (signaling) server — but reuse one if it's already running.
 SERVER_PID=""
-if lsof -ti:2567 >/dev/null 2>&1; then
-  echo "Multiplayer server already running — reusing it."
+if lsof -ti:9000 >/dev/null 2>&1; then
+  echo "Matchmaker already running — reusing it."
 else
-  echo "Starting multiplayer server…"
+  echo "Starting matchmaker (signaling) server…"
   npm run dev:server &
   SERVER_PID=$!
 fi
@@ -53,7 +54,7 @@ cleanup() {
   echo "Shutting down…"
   if [ -n "$SERVER_PID" ]; then
     kill "$SERVER_PID" 2>/dev/null
-    lsof -ti:2567 2>/dev/null | xargs kill 2>/dev/null
+    lsof -ti:9000 2>/dev/null | xargs kill 2>/dev/null
   fi
   exit 0
 }

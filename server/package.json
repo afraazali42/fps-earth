@@ -1,5 +1,5 @@
 {
-  "name": "fps-earth-server",
+  "name": "fps-earth-signaling",
   "private": true,
   "version": "0.0.1",
   "license": "MIT",
@@ -10,9 +10,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "@colyseus/core": "^0.17.0",
-    "@colyseus/ws-transport": "^0.17.0",
-    "express": "^5.2.1"
+    "peer": "^1.0.2"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

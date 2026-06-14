@@ -62,6 +62,9 @@ export interface DevTools {
   weaponInfo(): { shotsFired: number; lastShot: Weapon['lastShot'] };
   net(): {
     connected: boolean;
+    role: Net['role'];
+    shareCode: string;
+    status: string;
     sessionId: string;
     playerCount: number;
     renderedRemotes: number;
@@ -218,6 +221,9 @@ export function installDevTools(
     net() {
       return {
         connected: netClient.connected,
+        role: netClient.role,
+        shareCode: netClient.shareCode,
+        status: netClient.status,
         sessionId: netClient.sessionId,
         playerCount: netClient.players.length,
         renderedRemotes: remotes.count,

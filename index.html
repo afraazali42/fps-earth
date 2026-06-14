@@ -94,11 +94,24 @@
     #death.show { display: flex; }
     #death h2 { margin: 0; font-size: 40px; letter-spacing: 5px; color: #ff6b6b; }
     #death .sub { opacity: 0.85; font-size: 15px; }
+
+    #netstatus { margin-top: 6px; font-size: 13px; opacity: 0.9; min-height: 18px; max-width: 80vw; }
+    #netstatus .link {
+      color: #9fd0ff; word-break: break-all; font-family: ui-monospace, monospace;
+    }
+    #invite {
+      position: fixed; top: 12px; left: 12px; z-index: 11; display: none;
+      padding: 7px 12px; border-radius: 7px; cursor: pointer;
+      background: rgba(20, 28, 44, 0.85); color: #bcd0ff; border: 1px solid #3a5b9a;
+      font: 600 13px system-ui, -apple-system, sans-serif;
+    }
+    #invite.show { display: block; }
   </style>
 </head>
 <body>
   <div id="app"></div>
   <div id="damageflash"></div>
+  <button id="invite">&#128203; Copy invite link</button>
   <div id="crosshair"></div>
   <div id="hitmarker">&#10005;</div>
   <div id="score">&#9760; 0</div>
@@ -112,6 +125,7 @@
       Phase 1 &mdash; shoot, jump, and play with anyone who joins<br />
       <b>WASD</b> move &middot; <b>Mouse</b> look &middot; <b>Click</b> shoot &middot; <b>Space</b> jump &middot; <b>Shift</b> sprint &middot; <b>Esc</b> release mouse
     </div>
+    <div id="netstatus"></div>
     <div class="cta">Click anywhere to play</div>
   </div>
   <script type="module" src="/src/main.ts"></script>

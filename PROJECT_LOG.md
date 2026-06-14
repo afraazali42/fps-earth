@@ -35,25 +35,28 @@ health-darkening, death + timed respawn, kill counter HUD. Tracers, impact
 sparks, hitmarker (red on kill), simple viewmodel with recoil, procedural
 WebAudio sounds (shot/hit/kill — no asset files).
 
-**Multiplayer v0 (2026-06-10) — Phase 1 has begun:** a Colyseus game server
-(`server/`, runs with `npm run dev:server`) and the game auto-joining its lobby.
-Every player streams their position at 20 Hz; the server broadcasts everyone to
-everyone; other players appear as coloured capsules (visor shows facing) with
-smoothing between updates. Offline fallback: no server → single-player, quiet
-retry every 5 s. Verified with three simultaneous clients — movement propagated
-across clients exact to the decimal.
+**Multiplayer (2026-06-10 → 14):** networked presence, then a PvP deathmatch —
+shoot each other, health (100), death, 3 s respawn at spread-out spawns, and a
+kill/death tally. Remote players are coloured capsules with hittable physics
+colliders (cover still blocks); HUD has a health bar, damage flash, kill feed,
+ELIMINATED/respawn overlay, and a ☠ kills / ⊗ deaths counter. Damage is sent by
+the shooter so live weapon tuning works in PvP too.
 
-**PvP deathmatch (2026-06-14):** you can shoot each other. Remote players now
-carry physics colliders, so the rifle's raycast hits them (and cover still
-blocks). The server owns health (100), death, a 3 s respawn at spread-out spawn
-points, and the kill/death tally; the shooter reports the hit and the server
-applies damage (client sends the amount so live weapon tuning still works in
-PvP). HUD: health bar, red damage flash, kill feed, "ELIMINATED" + respawn
-overlay, and a ☠ kills / ⊗ deaths counter. **Honest caveat:** still
-client-authoritative for both position AND hit detection — fine for friends,
-replaced by the server-authoritative rewrite later in Phase 1.
+**Peer-to-peer hosting (2026-06-14) — no game servers:** the networking was
+re-architected from a paid Colyseus game server to **browser-hosted P2P**. One
+player is the host: their browser runs the game authority (`src/host.ts`);
+friends open the host's invite link and connect **directly over WebRTC**
+(`src/peerlink.ts`, PeerJS). The Node server (`server/`) is now just a tiny
+**signaling/matchmaker** (PeerServer) that helps browsers find each other and
+carries zero gameplay — free to run. `src/net.ts` hides the host/peer split
+behind one API. Verified end-to-end with two browsers: peer joined by link over
+WebRTC, peer's hit was resolved by the host's authority (host died, peer's kill
+counted), result broadcast back — all with no game server. **Honest caveats:**
+host has a latency edge and is trusted (could cheat); host leaving ends the game;
+~10–20% of strict home networks will need a TURN relay (not yet provided).
 
-**Not built yet:** public servers, rooms via shareable link, map editor, accounts.
+**Not built yet:** a deployed public matchmaker (works locally now), a TURN relay
+for strict networks, map editor, accounts, game-mode/rules UI.
 
 ## The plan (agreed 2026-06-09)
 
@@ -72,8 +75,9 @@ replaced by the server-authoritative rewrite later in Phase 1.
 | **Rapier 0.19** (`rapier3d-compat`) for physics | Runs identically in browser AND Node.js — the future anti-cheat server needs that. Built-in character controller (stairs/slopes/walls solved for us). Just shipped a voxel collider — purpose-built for block maps. Healthy funding. |
 | **Vite + TypeScript** tooling | Boring, reliable, instant reload. |
 | Maps = lists of boxes via `world.addBox()` | Every solid object creates its visual mesh + physics collider together. This IS the seed of the map format the editor will output. |
-| *(Phase 1, decided not built)* **Colyseus 0.17 over plain WebSockets**; host on Railway or Hetzner (~$5/mo) | WebSockets are what Krunker shipped on; fine for casual FPS. Colyseus's room model = "shareable link = room id". Upgrade path: WebTransport via `@colyseus/h3-transport` (Safari supports it since 26.4, Mar 2026). |
-| ⚠️ **Hathora is dead** (shut down 2026-05-05) | Was the old plan for game hosting — do not use. Edgegap is the scale-up alternative. |
+| ~~**Colyseus 0.17** game server~~ → **superseded 2026-06-14** | Was the Phase-1 networking (built & worked). Replaced by peer-to-peer to avoid paid game servers (below). Colyseus removed from the codebase. |
+| **Peer-to-peer hosting** (PeerJS/WebRTC), host-as-player; `server/` = signaling only | User wants community-maintained with no paid game servers. Host's browser is the authority; friends connect direct over WebRTC. Only shared infra is a tiny free matchmaker. Trade-offs accepted: host advantage/trust, host-leave ends game, ~10–20% need TURN. |
+| ⚠️ **Hathora is dead** (shut down 2026-05-05) | Was an old hosting idea — do not use. Now moot under P2P; Edgegap/Railway/Hetzner only relevant for hosting the tiny matchmaker (or an optional dedicated host) later. |
 | Worth knowing: **Hytopia** (hytopia.com) | "Browser Roblox" with voxel maps, launched 2025, MIT SDK, funds Rapier. Validates the architecture; our differentiator is the Halo-style FPS angle. |
 
 ## Session log
@@ -162,11 +166,34 @@ replaced by the server-authoritative rewrite later in Phase 1.
 - Not yet eyeballed (logic is in & simple): the 3 s respawn and the victim's
   death overlay — worth a look during your next real two-window playtest.
 
+### 2026-06-14 — Session 4: peer-to-peer hosting (no game servers)
+- User's directive: community-maintained, no paid game servers — each game has a
+  host who is a player; others connect peer-to-peer.
+- Re-architected networking: removed Colyseus; game authority now runs in the
+  host's browser (`src/host.ts`, ported from the old LobbyRoom); friends connect
+  directly over WebRTC via PeerJS (`src/peerlink.ts`); `server/` became a tiny
+  PeerServer **signaling/matchmaker** (port 9000). `src/net.ts` rewritten with a
+  host/peer role behind the same public API; `index.html`/`main.ts` gained the
+  host invite-link UI + "Copy invite link" chip. `play.command` (+ Desktop copy)
+  updated for the matchmaker. Client deps: removed @colyseus/sdk, added peerjs;
+  server: removed @colyseus/* + express, added peer.
+- **Verified end-to-end, two real browsers, NO game server:** host got a share
+  code from the matchmaker; peer joined via `?host=CODE` and connected over
+  WebRTC (status "connected to host", saw [HOST, self]); peer reported a hit →
+  host's browser authority resolved it (HOST hp 0, dead, deaths 1; peer kills 1)
+  → broadcast back to the peer. Screenshot of the host menu with live invite link.
+- Library notes for future: client `peerjs` 1.5.5 (`import { Peer }`), server
+  `peer` 1.0.2 (`PeerServer({port,path})`). Dev: `dev.net()` now reports
+  role/shareCode/status; `dev.hitPlayer(id,dmg)` reports a hit over the wire.
+- Same two-tab throttle gotcha as before — drove tests via `dev.step`/`dev.hitPlayer`
+  and asserted on the foreground host; the raycast-hit path was already verified
+  locally in Session 3, so this session proved the P2P transport + authority.
+
 ### Next session — pick one
-- **A. Go public:** deploy the server (Railway/Hetzner), rooms joinable via a
-  shareable link — the real "friend joins from their house" moment.
-- **B. Server-authoritative movement + hits** — the anti-cheat foundation;
-  replaces client-trusted positions/hits with server-run physics.
-- **C. Game modes / custom rules UI** — a lobby screen to set gravity, speed,
-  damage, score-to-win (the Halo-custom-games soul, made clickable).
-- **D. Polish:** third-person toggle, name tags, better player models, footsteps.
+- **A. Deploy the matchmaker** (Railway/Hetzner/Fly free-tier) + maybe a TURN
+  relay, so a friend can join from their house over the real internet. The
+  "friend from another house" moment. (Works on the same wifi today.)
+- **B. Game modes / custom-rules lobby UI** — host sets gravity, speed, damage,
+  score-to-win before starting (the Halo-custom-games soul, made clickable).
+- **C. Polish:** third-person toggle, name tags, footsteps, nicer player models.
+- **D. Robustness:** host-migration or graceful "host left" handling; reconnect.

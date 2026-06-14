@@ -1,20 +1,17 @@
-import { Room, Client } from '@colyseus/core';
-
 /**
- * Phase 1 — a shared world with combat.
+ * The game authority — runs in the HOST player's browser.
  *
- * Clients stream their own position ("move"); when a client's shot connects it
- * reports the hit ("hit"). The server owns health, death, respawn and the
- * kill/death tally, and broadcasts everyone's state at 20 Hz.
+ * This is the logic that used to live on the Node server (LobbyRoom). It owns
+ * health, death, respawn and the kill tally for every player in the match, and
+ * it broadcasts everyone's state ~20×/second. The host's own inputs feed in
+ * directly; peers' inputs arrive over WebRTC (see peerlink.ts / net.ts).
  *
- * This is still CLIENT-AUTHORITATIVE for position AND hit detection — clients
- * are trusted about where they are and who they hit. Fine for playing with
- * friends; the planned server-authoritative rewrite (server runs physics and
- * validates shots) replaces this trust later in Phase 1. Damage is sent by the
- * client so live weapon tuning (GameConfig) still works in PvP.
+ * Still trust-the-client for positions and hits — fine for a friends' lobby
+ * where you trust your host. A future server-authoritative mode can reuse this
+ * same class on a dedicated Node host.
  */
 
-interface PlayerState {
+export interface HostPlayerState {
   x: number;
   y: number;
   z: number;
@@ -26,12 +23,16 @@ interface PlayerState {
   deaths: number;
 }
 
+export interface NetPlayerWire extends HostPlayerState {
+  id: string;
+}
+
 const MAX_HEALTH = 100;
 const RESPAWN_SECONDS = 3;
-const MAX_HIT_DAMAGE = 1000; // sanity clamp only; real validation is the server-authoritative phase
+const MAX_HIT_DAMAGE = 1000; // sanity clamp only
 const BROADCAST_HZ = 20;
 
-// a handful of spread-out spawn points so players don't stack on one spot
+// spread-out spawn points so players don't stack on one spot
 const SPAWNS = [
   { x: 0, y: 2, z: 14, yaw: 0, pitch: 0 },
   { x: 17, y: 2, z: 3, yaw: -1.6, pitch: 0 },
@@ -40,42 +41,49 @@ const SPAWNS = [
   { x: -11, y: 2, z: -16, yaw: 2.4, pitch: 0 },
 ];
 
-export class LobbyRoom extends Room {
-  maxClients = 16;
-  private players = new Map<string, PlayerState>();
+export class GameHost {
+  onBroadcast: ((list: NetPlayerWire[]) => void) | null = null;
+  onKill: ((killerId: string, victimId: string) => void) | null = null;
+  onRespawn: ((id: string, x: number, y: number, z: number) => void) | null = null;
 
-  onCreate() {
-    this.onMessage('move', (client: Client, data: unknown) => {
-      const player = this.players.get(client.sessionId);
-      if (!player || !player.alive) return; // dead players don't move
-      const p = sanitizeMove(data);
-      if (!p) return;
-      player.x = p.x;
-      player.y = p.y;
-      player.z = p.z;
-      player.yaw = p.yaw;
-      player.pitch = p.pitch;
-    });
+  private players = new Map<string, HostPlayerState>();
+  private interval: ReturnType<typeof setInterval> | undefined;
 
-    this.onMessage('hit', (client: Client, data: unknown) => {
-      this.handleHit(client.sessionId, data);
-    });
-
-    this.setSimulationInterval(() => this.broadcastPlayers(), 1000 / BROADCAST_HZ);
-    console.log(`[lobby ${this.roomId}] created`);
+  start() {
+    if (this.interval !== undefined) return;
+    this.interval = setInterval(() => this.onBroadcast?.(this.list()), 1000 / BROADCAST_HZ);
   }
 
-  onJoin(client: Client) {
-    this.players.set(client.sessionId, this.freshPlayer());
-    console.log(`[lobby ${this.roomId}] ${client.sessionId} joined (${this.players.size} online)`);
+  stop() {
+    if (this.interval !== undefined) clearInterval(this.interval);
+    this.interval = undefined;
   }
 
-  onLeave(client: Client) {
-    this.players.delete(client.sessionId);
-    console.log(`[lobby ${this.roomId}] ${client.sessionId} left (${this.players.size} online)`);
+  list(): NetPlayerWire[] {
+    return Array.from(this.players.entries()).map(([id, p]) => ({ id, ...p }));
   }
 
-  private handleHit(shooterId: string, data: unknown) {
+  addPlayer(id: string) {
+    if (!this.players.has(id)) this.players.set(id, this.freshPlayer());
+  }
+
+  removePlayer(id: string) {
+    this.players.delete(id);
+  }
+
+  applyMove(id: string, data: unknown) {
+    const player = this.players.get(id);
+    if (!player || !player.alive) return; // dead players don't move
+    const m = sanitizeMove(data);
+    if (!m) return;
+    player.x = m.x;
+    player.y = m.y;
+    player.z = m.z;
+    player.yaw = m.yaw;
+    player.pitch = m.pitch;
+  }
+
+  applyHit(shooterId: string, data: unknown) {
     const shooter = this.players.get(shooterId);
     if (!shooter || !shooter.alive) return; // the dead can't shoot
 
@@ -93,9 +101,8 @@ export class LobbyRoom extends Room {
       victim.alive = false;
       victim.deaths++;
       shooter.kills++;
-      this.broadcast('kill', { killer: shooterId, victim: parsed.target });
-      console.log(`[lobby ${this.roomId}] ${shooterId} eliminated ${parsed.target}`);
-      this.clock.setTimeout(() => this.respawn(parsed.target), RESPAWN_SECONDS * 1000);
+      this.onKill?.(shooterId, parsed.target);
+      setTimeout(() => this.respawn(parsed.target), RESPAWN_SECONDS * 1000);
     }
   }
 
@@ -110,17 +117,12 @@ export class LobbyRoom extends Room {
     player.pitch = spawn.pitch;
     player.hp = MAX_HEALTH;
     player.alive = true;
-    this.broadcast('respawn', { id, x: spawn.x, y: spawn.y, z: spawn.z });
+    this.onRespawn?.(id, spawn.x, spawn.y, spawn.z);
   }
 
-  private freshPlayer(): PlayerState {
+  private freshPlayer(): HostPlayerState {
     const spawn = SPAWNS[Math.floor(Math.random() * SPAWNS.length)]!;
     return { ...spawn, hp: MAX_HEALTH, alive: true, kills: 0, deaths: 0 };
-  }
-
-  private broadcastPlayers() {
-    const list = Array.from(this.players.entries()).map(([id, p]) => ({ id, ...p }));
-    this.broadcast('players', list);
   }
 }
 

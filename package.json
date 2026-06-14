@@ -11,8 +11,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@colyseus/sdk": "^0.17.42",
     "@dimforge/rapier3d-compat": "^0.19.3",
+    "peerjs": "^1.5.5",
     "three": "^0.184.0"
   },
   "devDependencies": {
