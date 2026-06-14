@@ -88,7 +88,13 @@ async function main() {
   const hostCode = params.get('host');
   const role: 'host' | 'peer' = hostCode ? 'peer' : 'host';
   const signal = parseSignal(params.get('signal'));
-  const net = new Net(player, { role, hostCode: hostCode ?? undefined, signal, config });
+  const net = new Net(player, {
+    role,
+    hostCode: hostCode ?? undefined,
+    signal,
+    config,
+    getMap: () => world.toMap(),
+  });
   const remotes = new RemotePlayers(world);
 
   const inviteLink = () =>
@@ -128,6 +134,13 @@ async function main() {
   };
   applyRules();
 
+  // peers: when the host sends their map, rebuild the world and drop in at its spawn
+  net.onMap = (map) => {
+    world.loadMap(map);
+    player.setSpawn(map.spawn.x, map.spawn.y, map.spawn.z);
+    player.respawn();
+  };
+
   // hitmarker: flash on hit, bigger and red on kill
   let hitmarkerTimer: ReturnType<typeof setTimeout> | undefined;
   const ui = {
@@ -158,6 +171,8 @@ async function main() {
         // dropping in from build mode: start at the map's spawn point
         player.setSpawn(world.spawn.x, world.spawn.y, world.spawn.z);
         player.respawn();
+        // share the freshly-built map with everyone who's joined
+        if (net.role === 'host') net.broadcastMap();
       }
     }
   };

@@ -87,6 +87,7 @@ export interface DevTools {
   editorView(yawDeg: number, pitchDeg: number, pos?: [number, number, number]): void;
   editorStep(seconds: number): void;
   reloadMap(): number;
+  syncMap(): void;
 }
 
 declare global {
@@ -308,6 +309,10 @@ export function installDevTools(
       const m = loadSavedMap();
       if (m) world.loadMap(m);
       return world.getBlocks().length;
+    },
+    /** Host: push the current map to all peers. */
+    syncMap() {
+      netClient.broadcastMap();
     },
   };
 

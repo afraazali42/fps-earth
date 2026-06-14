@@ -79,13 +79,20 @@ and playing (shooting, HUD) inside a built 22-block map. **Bug found & fixed:** 
 raycaster read a stale camera matrix (Three.js only refreshes it at render time) —
 now `camera.updateMatrixWorld()` before each placement raycast.
 
-**Honest v1 limits:** uniform 2 m cubes only (no slabs/ramps/sizes yet); the
-editor is host/solo — your custom map does NOT yet sync to peers (they play the
-default arena), the clear next step (sync the map like we sync the rules); practice
-targets still appear in custom maps.
+**Map sync over P2P (2026-06-14):** custom maps now reach the people who join you.
+The host sends its map to each peer on join, and re-broadcasts when it returns
+from build mode (`Net.broadcastMap` / `onMap`, peers rebuild via `World.loadMap`
+and respawn at the map's spawn) — same pattern as the rules sync. `parseMap`
+validates incoming map data. Verified across two separate browsers (so storage
+couldn't cheat): a peer received the host's 18-block map on join, and a live host
+edit (→22) propagated to the peer. The build-and-play-together loop is complete.
 
-**Not built yet:** map sync to peers, a deployed public matchmaker (works locally
-now), a TURN relay for strict networks, accounts, more block shapes.
+**Honest v1 limits:** uniform 2 m cubes only (no slabs/ramps/sizes yet); practice
+targets still appear in custom maps; big maps send as one JSON blob (fine for now,
+may want compression for huge maps later).
+
+**Not built yet:** a deployed public matchmaker (works locally/LAN now), a TURN
+relay for strict networks, accounts, richer block shapes, a blank-canvas start.
 
 ## The plan (agreed 2026-06-09)
 
@@ -247,12 +254,23 @@ now), a TURN relay for strict networks, accounts, more block shapes.
   → palette + active highlight → set spawn → save→reload keeps all 22 blocks →
   play mode FPS inside the built map. Two milestone screenshots (edit + play).
 
+### 2026-06-14 — Session 7: map sync over P2P
+- Made custom maps reach peers: `parseMap` (reusable validator), `Net.broadcastMap`
+  + `onMap`, host sends map on peer-join and on returning from build mode, peers
+  rebuild via `World.loadMap` + respawn at the map spawn. Dev: `dev.syncMap()`.
+- Verified across TWO SEPARATE BROWSERS (preview host + Chrome peer, so each had
+  its own localStorage and sync couldn't be faked by shared storage): peer got the
+  host's 18-block map on join; a live host edit (→22) propagated to the peer; took
+  a screenshot of the peer standing in the host's custom map.
+- Test note: a backgrounded HOST tab gets dropped by the signaling heartbeat, so
+  for host+peer tests use the preview client as the (always-active) host and a
+  Chrome tab as the peer.
+
 ### Next session — pick one
-- **A. Sync custom maps to peers** — so friends play YOUR map, not the default
-  (send the map over P2P on join, like we already sync the rules). Makes the
-  editor multiplayer; natural follow-on to this session.
-- **B. Editor depth** — variable block sizes / slabs / ramps, undo, a way to start
-  from blank ("build my house"), maybe simple textures.
+- **B. Editor depth** — variable block sizes / slabs / ramps, undo, a blank-canvas
+  start ("build my house"), maybe simple textures. Deepens the differentiator.
 - **C. Deploy the matchmaker** — a friend joins from their house over the internet.
-- **D. More rules + game modes** — score-to-win, teams, more weapons.
+- **D. More rules + game modes** — score-to-win, time limit, teams, more weapons.
 - **E. Polish:** third-person toggle, name tags, footsteps, nicer player models.
+- **F. A map browser / sharing** — save named maps, share a map by code (beginnings
+  of the community map library).

@@ -2,6 +2,7 @@ import type { Player } from './player';
 import { GameHost, type NetPlayerWire } from './host';
 import { PeerHost, PeerClient, type SignalConfig } from './peerlink';
 import { applyConfig, type GameConfig } from './config';
+import { parseMap, type GameMap } from './gamemap';
 
 /** One player's state, as the host's authority reports it. */
 export type NetPlayerState = NetPlayerWire;
@@ -17,6 +18,8 @@ export interface NetOptions {
   signal: SignalConfig;
   /** the live game rules — host sends these to peers; peers receive into them */
   config: GameConfig;
+  /** current map, fetched fresh when the host needs to send it */
+  getMap: () => GameMap;
 }
 
 /**
@@ -45,6 +48,8 @@ export class Net {
   onStatus: ((status: string) => void) | null = null;
   /** peer: fired when the host's rules arrive and have been applied to config */
   onConfig: (() => void) | null = null;
+  /** peer: fired with the host's map (already parsed) — rebuild the world from it */
+  onMap: ((map: GameMap) => void) | null = null;
 
   private sendAccumulator = 0;
   private game?: GameHost;
@@ -70,6 +75,11 @@ export class Net {
   /** Host: push the current rules to everyone (call after changing settings). */
   broadcastConfig() {
     this.peerHost?.sendToAll('config', this.opts.config);
+  }
+
+  /** Host: push the current map to everyone (call after editing). */
+  broadcastMap() {
+    this.peerHost?.sendToAll('map', this.opts.getMap());
   }
 
   /** Tell the authority our shot connected with another player. */
@@ -125,7 +135,9 @@ export class Net {
     };
     host.onPeerJoin = (id) => {
       game.addPlayer(id);
-      host.sendTo(id, 'config', this.opts.config); // bring the new player onto our rules
+      // bring the new player onto our rules AND our map
+      host.sendTo(id, 'config', this.opts.config);
+      host.sendTo(id, 'map', this.opts.getMap());
     };
     host.onPeerLeave = (id) => game.removePlayer(id);
     host.onMessage = (from, type, data) => {
@@ -156,6 +168,9 @@ export class Net {
       } else if (type === 'config') {
         applyConfig(this.opts.config, data);
         this.onConfig?.();
+      } else if (type === 'map') {
+        const map = parseMap(data);
+        if (map) this.onMap?.(map);
       }
     };
     client.onClose = () => {

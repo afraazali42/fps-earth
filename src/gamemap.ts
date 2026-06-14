@@ -97,7 +97,7 @@ export function loadSavedMap(): GameMap | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as unknown;
-    return validateMap(data);
+    return parseMap(data);
   } catch {
     return null;
   }
@@ -115,8 +115,8 @@ function num(v: unknown): v is number {
   return typeof v === 'number' && Number.isFinite(v);
 }
 
-/** Defensive parse: rebuild a clean GameMap from untrusted JSON, fresh ids. */
-function validateMap(data: unknown): GameMap | null {
+/** Defensive parse: rebuild a clean GameMap from untrusted data, fresh ids. */
+export function parseMap(data: unknown): GameMap | null {
   if (typeof data !== 'object' || data === null) return null;
   const d = data as Record<string, unknown>;
   if (!Array.isArray(d.blocks)) return null;

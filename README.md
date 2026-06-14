@@ -15,8 +15,9 @@ respawn, kill/death tally). Multiplayer is **peer-to-peer** — one player hosts
 their browser and friends join by link; there's no game server to pay for. The
 host sets the **game rules** — gravity, speeds, jump, damage, fire rate, with
 one-click presets — live for everyone. And there's a **block-based map editor**:
-build a map, set the spawn, and play in it (saved in your browser). Built in
-public; follow the journey in [PROJECT_LOG.md](PROJECT_LOG.md).
+the host builds a map, sets the spawn, and everyone who joins plays it — maps
+sync over the peer-to-peer link (and save in your browser). Built in public;
+follow the journey in [PROJECT_LOG.md](PROJECT_LOG.md).
 
 ## Run it
 
@@ -84,8 +85,10 @@ Click **🔨 Build a map** in the menu (or press **B** while playing) to enter t
 | Enter | Play your map |
 | Esc | Menu |
 
-Your map saves to the browser automatically. (Sharing maps with the people who
-join you is the next step — for now the editor is a solo/host build tool.)
+Your map saves to the browser automatically, and it **syncs to everyone who
+joins you**: friends receive your map when they connect, and again whenever you
+return from build mode — so you build, hit Enter, and your friends are playing
+your creation.
 
 ### Dev controls (only in `npm run dev`)
 
