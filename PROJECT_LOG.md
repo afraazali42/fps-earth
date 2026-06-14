@@ -66,8 +66,26 @@ foundation. Verified end-to-end: peer inherited host's rules on join (gravity -6
 move 9, damage 100, fire rate 2) and a mid-game change (gravity -2, damage 7)
 propagated live.
 
-**Not built yet:** a deployed public matchmaker (works locally now), a TURN relay
-for strict networks, map editor, accounts.
+**Map editor — Phase 2 begun (2026-06-14):** a block-based editor (`src/editor.ts`).
+Maps are now DATA (`src/gamemap.ts`): a list of blocks + a spawn, with a default
+arena, saved to the browser (localStorage). The world builds from a map
+(`World.loadMap`, blocks tracked by id, add/remove). Build mode = a free-fly
+camera, raycast placement with a live ghost preview (left-click place on the face
+you're looking at, right-click remove), an 8-colour palette (number keys), F to
+set spawn, Enter to play, Esc to menu — host only (the 🔨 Build button shows for
+hosts). Edits auto-save; play mode drops you into your map at its spawn. Verified
+the full loop: raycast placement, palette, set-spawn, save→reload persistence,
+and playing (shooting, HUD) inside a built 22-block map. **Bug found & fixed:** the
+raycaster read a stale camera matrix (Three.js only refreshes it at render time) —
+now `camera.updateMatrixWorld()` before each placement raycast.
+
+**Honest v1 limits:** uniform 2 m cubes only (no slabs/ramps/sizes yet); the
+editor is host/solo — your custom map does NOT yet sync to peers (they play the
+default arena), the clear next step (sync the map like we sync the rules); practice
+targets still appear in custom maps.
+
+**Not built yet:** map sync to peers, a deployed public matchmaker (works locally
+now), a TURN relay for strict networks, accounts, more block shapes.
 
 ## The plan (agreed 2026-06-09)
 
@@ -85,7 +103,7 @@ for strict networks, map editor, accounts.
 | **Three.js r184** (classic WebGL renderer) for 3D | Biggest community/examples by far; WebGL2 works for ~everyone. Its newer WebGPU mode is still churning — can migrate later, no urgency. |
 | **Rapier 0.19** (`rapier3d-compat`) for physics | Runs identically in browser AND Node.js — the future anti-cheat server needs that. Built-in character controller (stairs/slopes/walls solved for us). Just shipped a voxel collider — purpose-built for block maps. Healthy funding. |
 | **Vite + TypeScript** tooling | Boring, reliable, instant reload. |
-| Maps = lists of boxes via `world.addBox()` | Every solid object creates its visual mesh + physics collider together. This IS the seed of the map format the editor will output. |
+| Maps = lists of boxes → now **`GameMap` data** (`src/gamemap.ts`) | The day-one "maps are lists of boxes" bet paid off: the editor produces a GameMap, the world builds from one, and a shared/custom map will be one too — same pattern as rules-as-data. Block editor places uniform 2 m cubes on a grid (simplest for non-coders; richer shapes later). |
 | ~~**Colyseus 0.17** game server~~ → **superseded 2026-06-14** | Was the Phase-1 networking (built & worked). Replaced by peer-to-peer to avoid paid game servers (below). Colyseus removed from the codebase. |
 | **Peer-to-peer hosting** (PeerJS/WebRTC), host-as-player; `server/` = signaling only | User wants community-maintained with no paid game servers. Host's browser is the authority; friends connect direct over WebRTC. Only shared infra is a tiny free matchmaker. Trade-offs accepted: host advantage/trust, host-leave ends game, ~10–20% need TURN. |
 | ⚠️ **Hathora is dead** (shut down 2026-05-05) | Was an old hosting idea — do not use. Now moot under P2P; Edgegap/Railway/Hetzner only relevant for hosting the tiny matchmaker (or an optional dedicated host) later. |
@@ -214,12 +232,27 @@ for strict networks, map editor, accounts.
   (gravity -2, dmg 7) propagated to the peer; peer panel correctly read-only.
   Screenshot of the host rules panel (Floaty Brawl preset) taken.
 
+### 2026-06-14 — Session 6: map editor (Phase 2 begins)
+- Maps became data (`src/gamemap.ts`): blocks + spawn, default arena, localStorage
+  save/load with defensive validation. Refactored `World` to build from a map and
+  track blocks by id (add/remove); retired the hardcoded playground for a cleaner
+  starter arena. `Player` spawns from the map (`setSpawn`).
+- Built the editor (`src/editor.ts`): free-fly camera, raycast ghost preview,
+  place (LMB) / remove (RMB), 8-colour palette (Digit1-8), F set spawn. `main.ts`
+  gained a play/edit mode machine; `index.html` the 🔨 Build button + edit HUD;
+  Input now tracks right-click (Mouse2). New dev hooks: setMode/mode/placeBlock/
+  blockCount/mapSpawn/editorView/editorStep/reloadMap.
+- Verified the whole loop via the preview client (solo, reliable): default 8-block
+  arena → build mode → raycast placement (after fixing a stale-camera-matrix bug)
+  → palette + active highlight → set spawn → save→reload keeps all 22 blocks →
+  play mode FPS inside the built map. Two milestone screenshots (edit + play).
+
 ### Next session — pick one
-- **A. Deploy the matchmaker** (Railway/Hetzner/Fly free-tier) + maybe a TURN
-  relay, so a friend can join from their house over the real internet. The
-  "friend from another house" moment. (Works on the same machine/LAN today.)
-- **B. More rules + game modes** — score-to-win / time limit / team play, more
-  weapons or per-class traits (deepens the custom-games vault).
-- **C. Polish:** third-person toggle, name tags, footsteps, nicer player models.
-- **D. Robustness:** graceful "host left" handling; reconnect; host migration.
-- **E. Map editor (Phase 2)** — the big differentiator; build & share maps.
+- **A. Sync custom maps to peers** — so friends play YOUR map, not the default
+  (send the map over P2P on join, like we already sync the rules). Makes the
+  editor multiplayer; natural follow-on to this session.
+- **B. Editor depth** — variable block sizes / slabs / ramps, undo, a way to start
+  from blank ("build my house"), maybe simple textures.
+- **C. Deploy the matchmaker** — a friend joins from their house over the internet.
+- **D. More rules + game modes** — score-to-win, teams, more weapons.
+- **E. Polish:** third-person toggle, name tags, footsteps, nicer player models.

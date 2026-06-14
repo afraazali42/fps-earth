@@ -9,13 +9,14 @@ rules are **data, not code** — gravity, speeds, and (eventually) classes, dama
 and win conditions are all live-tunable config, and a custom game type will be a
 shareable file, just like a map.
 
-**Current state: Phase 1** — a first-person shooter you play with others: walk,
-sprint, jump and shoot around a 3D playground, with networked deathmatch (health,
-death, respawn, kill/death tally). Multiplayer is **peer-to-peer** — one player
-hosts in their browser and friends join by link; there's no game server to pay
-for. The host sets the **game rules** — gravity, speeds, jump, damage, fire rate,
-with one-click presets — and they apply to everyone, live. Built in public;
-follow the journey in [PROJECT_LOG.md](PROJECT_LOG.md).
+**Current state: Phase 2 underway.** It's a first-person shooter you play with
+others: walk, sprint, jump and shoot, with networked deathmatch (health, death,
+respawn, kill/death tally). Multiplayer is **peer-to-peer** — one player hosts in
+their browser and friends join by link; there's no game server to pay for. The
+host sets the **game rules** — gravity, speeds, jump, damage, fire rate, with
+one-click presets — live for everyone. And there's a **block-based map editor**:
+build a map, set the spawn, and play in it (saved in your browser). Built in
+public; follow the journey in [PROJECT_LOG.md](PROJECT_LOG.md).
 
 ## Run it
 
@@ -69,6 +70,23 @@ LAN host of old.
 | Shift | Sprint |
 | Esc | Release mouse / menu |
 
+### Build mode (host only)
+
+Click **🔨 Build a map** in the menu (or press **B** while playing) to enter the editor:
+
+| Control | Action |
+|---|---|
+| WASD + Space/Shift | Fly around |
+| Left click | Place a block |
+| Right click | Remove a block |
+| 1–8 | Pick a colour |
+| F | Set the spawn point |
+| Enter | Play your map |
+| Esc | Menu |
+
+Your map saves to the browser automatically. (Sharing maps with the people who
+join you is the next step — for now the editor is a solo/host build tool.)
+
 ### Dev controls (only in `npm run dev`)
 
 | Key | Action |
@@ -85,6 +103,8 @@ There's also a `dev.*` API in the browser console for automated testing —
 |---|---|
 | [src/config.ts](src/config.ts) | **The game rules as data** — gravity, speeds, jump, damage. Custom game types = copies of this |
 | [src/settings.ts](src/settings.ts) | The host's "Game rules" panel — sliders + presets that edit the live config |
+| [src/gamemap.ts](src/gamemap.ts) | **A map as data** — a list of blocks + spawn; default arena, save/load to the browser |
+| [src/editor.ts](src/editor.ts) | Build mode — free-fly camera, raycast block place/remove, palette, spawn |
 | [src/main.ts](src/main.ts) | Boots everything; runs the game loop (60 Hz physics, smooth rendering) |
 | [src/world.ts](src/world.ts) | The 3D scene + physics world; `addBox()` builds the map |
 | [src/player.ts](src/player.ts) | First-person movement: capsule physics, camera, jumping |

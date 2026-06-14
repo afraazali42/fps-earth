@@ -63,6 +63,11 @@ export class Weapon {
     camera.add(this.viewmodel);
   }
 
+  /** Hide the viewmodel (e.g. in build mode). */
+  setHidden(hidden: boolean) {
+    this.viewmodel.visible = !hidden;
+  }
+
   /** Runs at the fixed physics rate, after physics.step(). */
   fixedUpdate(dt: number) {
     this.cooldown = Math.max(0, this.cooldown - dt);

@@ -130,6 +130,33 @@
     .knob input:disabled { opacity: 0.5; cursor: default; }
     .knob-value { text-align: right; font-family: ui-monospace, monospace; color: #bcd0ff; }
     .settings-note { margin-top: 10px; font-size: 12px; opacity: 0.65; }
+
+    #build-btn {
+      margin-top: 2px; padding: 10px 24px; font-size: 15px; cursor: pointer;
+      border: 1px solid #6b8f5b; border-radius: 8px; color: #c7e7b8; font-weight: 600;
+      background: rgba(30, 46, 28, 0.6); font-family: system-ui, -apple-system, sans-serif;
+    }
+    #build-btn.hidden { display: none; }
+
+    #edithud {
+      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 6;
+      display: none; flex-direction: column; align-items: center; gap: 8px;
+      pointer-events: none; font-family: system-ui, -apple-system, sans-serif;
+    }
+    body.editing #edithud { display: flex; }
+    body.editing #health, body.editing #score,
+    body.editing #killfeed, body.editing #hitmarker { display: none !important; }
+    .edit-hint { color: rgba(255, 255, 255, 0.82); font-size: 13px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+    #palette { display: flex; gap: 6px; }
+    .swatch {
+      width: 26px; height: 26px; border-radius: 5px; position: relative;
+      border: 2px solid rgba(255, 255, 255, 0.25); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    }
+    .swatch.active { border-color: #fff; transform: scale(1.15); }
+    .swatch b {
+      position: absolute; bottom: -3px; right: 1px; font-size: 9px; font-weight: 700;
+      color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 2px #000;
+    }
   </style>
 </head>
 <body>
@@ -142,6 +169,12 @@
   <div id="killfeed"></div>
   <div id="health"><span class="bar"><span class="fill"></span></span><span class="num">100</span></div>
   <div id="death"><h2>ELIMINATED</h2><div class="sub">Respawning&hellip;</div></div>
+  <div id="edithud">
+    <div class="edit-hint">
+      <b>LMB</b> place &middot; <b>RMB</b> remove &middot; <b>1&ndash;8</b> colour &middot; <b>F</b> set spawn &middot; <b>Enter</b> play &middot; <b>Esc</b> menu
+    </div>
+    <div id="palette"></div>
+  </div>
   <div id="hud"></div>
   <div id="overlay">
     <h1>FPS&#8209;EARTH</h1>
@@ -152,6 +185,7 @@
     <div id="netstatus"></div>
     <div id="settings"></div>
     <div class="cta">Click anywhere to play</div>
+    <button id="build-btn" class="hidden">&#128296; Build a map</button>
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>

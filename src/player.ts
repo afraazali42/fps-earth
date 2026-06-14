@@ -14,7 +14,6 @@ const EYE_HEIGHT = 0.75;
 const MOUSE_SENSITIVITY = 0.0022;
 const RESPAWN_BELOW_Y = -25;
 
-const SPAWN = new THREE.Vector3(0, 2, 14);
 const UP = new THREE.Vector3(0, 1, 0);
 
 /**
@@ -36,6 +35,7 @@ export class Player {
   // previous/current physics positions, interpolated for smooth rendering
   private prevPos = new THREE.Vector3();
   private currPos = new THREE.Vector3();
+  private spawn = new THREE.Vector3(0, 2, 14);
 
   constructor(
     world: World,
@@ -43,10 +43,11 @@ export class Player {
     private camera: THREE.PerspectiveCamera,
     private config: GameConfig,
   ) {
+    this.spawn.set(world.spawn.x, world.spawn.y, world.spawn.z);
     const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(
-      SPAWN.x,
-      SPAWN.y,
-      SPAWN.z,
+      this.spawn.x,
+      this.spawn.y,
+      this.spawn.z,
     );
     this.body = world.physics.createRigidBody(bodyDesc);
     this.collider = world.physics.createCollider(
@@ -60,8 +61,8 @@ export class Player {
     this.controller.setMaxSlopeClimbAngle((50 * Math.PI) / 180);
     this.controller.setMinSlopeSlideAngle((55 * Math.PI) / 180);
 
-    this.currPos.copy(SPAWN);
-    this.prevPos.copy(SPAWN);
+    this.currPos.copy(this.spawn);
+    this.prevPos.copy(this.spawn);
   }
 
   /** Every rendered frame: turn accumulated mouse motion into view angles. */
@@ -118,7 +119,12 @@ export class Player {
   }
 
   respawn() {
-    this.teleport(SPAWN.x, SPAWN.y, SPAWN.z);
+    this.teleport(this.spawn.x, this.spawn.y, this.spawn.z);
+  }
+
+  /** Set the respawn point (from the loaded map). */
+  setSpawn(x: number, y: number, z: number) {
+    this.spawn.set(x, y, z);
   }
 
   /** Instantly move the player (also used by dev tools). */

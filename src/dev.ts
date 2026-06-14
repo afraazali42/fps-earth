@@ -5,6 +5,11 @@ import type { TargetManager } from './targets';
 import type { Weapon } from './weapon';
 import type { Net, NetPlayerState } from './net';
 import type { RemotePlayers } from './remote';
+import type { World } from './world';
+import type { Editor } from './editor';
+import { GRID, nextBlockId, saveMap, loadSavedMap } from './gamemap';
+
+type Mode = 'play' | 'edit';
 
 /**
  * Dev/testing tools — only installed when running `npm run dev`, never in a
@@ -73,6 +78,15 @@ export interface DevTools {
   self(): NetPlayerState | undefined;
   hitPlayer(targetId: string, damage?: number): void;
   broadcastRules(patch: Partial<GameConfig>): GameConfig;
+  // map editor
+  mode(): Mode;
+  setMode(m: Mode): void;
+  blockCount(): number;
+  mapSpawn(): { x: number; y: number; z: number };
+  placeBlock(x: number, y: number, z: number, color?: number): number;
+  editorView(yawDeg: number, pitchDeg: number, pos?: [number, number, number]): void;
+  editorStep(seconds: number): void;
+  reloadMap(): number;
 }
 
 declare global {
@@ -89,7 +103,10 @@ export function installDevTools(
   weapon: Weapon,
   netClient: Net,
   remotes: RemotePlayers,
-  sim: { step(dt: number): void; render(): void },
+  world: World,
+  editor: Editor,
+  modeCtl: { get(): Mode; set(m: Mode): void },
+  sim: { step(dt: number): void; render(): void; draw(): void },
 ): DevTools {
   const held = new Set<string>();
 
@@ -246,6 +263,51 @@ export function installDevTools(
       const updated = tools.tune(patch);
       netClient.broadcastConfig();
       return updated;
+    },
+
+    // --- map editor -------------------------------------------------------
+
+    mode() {
+      return modeCtl.get();
+    },
+    setMode(m: Mode) {
+      modeCtl.set(m);
+    },
+    blockCount() {
+      return world.getBlocks().length;
+    },
+    mapSpawn() {
+      return { ...world.spawn };
+    },
+    /** Place a block directly at a cell (bypasses aiming) and save. */
+    placeBlock(x: number, y: number, z: number, color?: number) {
+      world.addBlock({
+        id: nextBlockId(),
+        x,
+        y,
+        z,
+        w: GRID,
+        h: GRID,
+        d: GRID,
+        color: color ?? editor.currentColor,
+      });
+      saveMap(world.toMap());
+      return world.getBlocks().length;
+    },
+    editorView(yawDeg: number, pitchDeg: number, pos?: [number, number, number]) {
+      editor.setView(yawDeg, pitchDeg, pos);
+    },
+    /** Advance the editor (free-fly + raycast placement) deterministically. */
+    editorStep(seconds: number) {
+      const ticks = Math.min(600, Math.max(1, Math.round(seconds * 60)));
+      for (let i = 0; i < ticks; i++) editor.update(1 / 60);
+      sim.draw();
+    },
+    /** Reload the map from browser storage (test persistence). */
+    reloadMap() {
+      const m = loadSavedMap();
+      if (m) world.loadMap(m);
+      return world.getBlocks().length;
     },
   };
 

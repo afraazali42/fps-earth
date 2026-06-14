@@ -9,7 +9,9 @@ import { Sfx } from './audio';
 import { Net } from './net';
 import { RemotePlayers } from './remote';
 import { SettingsPanel } from './settings';
+import { Editor, PALETTE } from './editor';
 import { DEFAULT_CONFIG } from './config';
+import { defaultMap, loadSavedMap } from './gamemap';
 
 const PHYSICS_STEP = 1 / 60; // physics runs at a fixed 60 Hz regardless of display refresh rate
 
@@ -43,6 +45,8 @@ async function main() {
   const netstatusEl = document.querySelector<HTMLDivElement>('#netstatus')!;
   const inviteEl = document.querySelector<HTMLButtonElement>('#invite')!;
   const settingsContainerEl = document.querySelector<HTMLDivElement>('#settings')!;
+  const buildBtnEl = document.querySelector<HTMLButtonElement>('#build-btn')!;
+  const paletteEl = document.querySelector<HTMLDivElement>('#palette')!;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -65,8 +69,11 @@ async function main() {
     targets: { ...DEFAULT_CONFIG.targets },
   };
 
+  // load the saved map if there is one, otherwise the starter arena
+  const startingMap = loadSavedMap() ?? defaultMap();
+
   const input = new Input(document.body);
-  const world = new World(config);
+  const world = new World(config, startingMap);
   const player = new Player(world, input, camera, config);
   const targets = new TargetManager(world, config);
   const sfx = new Sfx();
@@ -133,6 +140,58 @@ async function main() {
   };
 
   const weapon = new Weapon(world, player, camera, input, config, targets, sfx, ui, remotes, net);
+  const editor = new Editor(world, input, camera);
+
+  // --- play / build mode switching ----------------------------------------
+
+  let mode: 'play' | 'edit' = 'play';
+  const setMode = (m: 'play' | 'edit') => {
+    const was = mode;
+    mode = m;
+    document.body.classList.toggle('editing', m === 'edit');
+    weapon.setHidden(m === 'edit');
+    if (m === 'edit') {
+      editor.enter();
+    } else {
+      editor.exit();
+      if (was === 'edit') {
+        // dropping in from build mode: start at the map's spawn point
+        player.setSpawn(world.spawn.x, world.spawn.y, world.spawn.z);
+        player.respawn();
+      }
+    }
+  };
+
+  // build button only for the host (peers play the host's map)
+  buildBtnEl.classList.toggle('hidden', net.role !== 'host');
+  buildBtnEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    overlay.classList.add('hidden');
+    setMode('edit');
+    input.requestLock();
+  });
+
+  // build the colour palette HUD
+  for (let i = 0; i < PALETTE.length; i++) {
+    const sw = document.createElement('div');
+    sw.className = 'swatch';
+    sw.style.background = `#${PALETTE[i]!.toString(16).padStart(6, '0')}`;
+    sw.innerHTML = `<b>${i + 1}</b>`;
+    paletteEl.appendChild(sw);
+  }
+  const swatches = [...paletteEl.children] as HTMLElement[];
+  const updatePaletteUI = () => {
+    for (let i = 0; i < swatches.length; i++) {
+      swatches[i]!.classList.toggle('active', i === editor.colorIndex);
+    }
+  };
+
+  // quick toggles while playing/building (host only for build)
+  window.addEventListener('keydown', (e) => {
+    if (!input.pointerLocked) return;
+    if (e.code === 'Enter' && mode === 'edit') setMode('play');
+    else if (e.code === 'KeyB' && mode === 'play' && net.role === 'host') setMode('edit');
+  });
 
   // --- combat HUD: health, damage flash, kill feed, death/respawn ----------
 
@@ -211,6 +270,7 @@ async function main() {
   // lock, which can fail or be unavailable on some devices
   overlay.addEventListener('click', () => {
     overlay.classList.add('hidden');
+    setMode('play');
     input.requestLock();
   });
   // clicking the game canvas re-engages pointer lock if it was lost or failed
@@ -265,25 +325,29 @@ async function main() {
     last = now;
     dt = Math.min(dt, 0.1); // returning from a background tab: don't fast-forward
 
-    player.updateLook();
-
-    accumulator += dt;
-    while (accumulator >= PHYSICS_STEP) {
-      stepSimulation(PHYSICS_STEP);
-      accumulator -= PHYSICS_STEP;
+    if (mode === 'edit') {
+      editor.update(dt);
+      updatePaletteUI();
+      renderer.render(world.scene, camera);
+    } else {
+      player.updateLook();
+      accumulator += dt;
+      while (accumulator >= PHYSICS_STEP) {
+        stepSimulation(PHYSICS_STEP);
+        accumulator -= PHYSICS_STEP;
+      }
+      player.updateCamera(accumulator / PHYSICS_STEP);
+      weapon.renderUpdate(dt);
+      reconcileLife();
+      renderer.render(world.scene, camera);
+      syncScore();
     }
-
-    player.updateCamera(accumulator / PHYSICS_STEP);
-    weapon.renderUpdate(dt);
-    reconcileLife();
-    renderer.render(world.scene, camera);
-    syncScore();
 
     fpsFrames++;
     fpsTime += dt;
     if (fpsTime >= 0.5) {
-      const online = net.connected ? `${net.players.length} online` : 'offline';
-      hud.textContent = `${Math.round(fpsFrames / fpsTime)} fps · fps-earth phase 1 · ${online}`;
+      const tag = mode === 'edit' ? 'build' : net.connected ? `${net.players.length} online` : 'offline';
+      hud.textContent = `${Math.round(fpsFrames / fpsTime)} fps · fps-earth · ${tag}`;
       fpsFrames = 0;
       fpsTime = 0;
     }
@@ -291,10 +355,19 @@ async function main() {
 
   if (import.meta.env.DEV) {
     const { installDevTools } = await import('./dev');
-    window.dev = installDevTools(player, input, config, targets, weapon, net, remotes, {
-      step: stepSimulation,
-      render: renderFrame,
-    });
+    window.dev = installDevTools(
+      player,
+      input,
+      config,
+      targets,
+      weapon,
+      net,
+      remotes,
+      world,
+      editor,
+      { get: () => mode, set: setMode },
+      { step: stepSimulation, render: renderFrame, draw: () => renderer.render(world.scene, camera) },
+    );
     console.log('[fps-earth] dev tools installed — try dev.state() in the console');
   }
 
