@@ -53,19 +53,64 @@
       color: rgba(255, 255, 255, 0.85); font: 600 18px ui-monospace, monospace;
       text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
     }
+
+    #health {
+      position: fixed; left: 16px; bottom: 30px; z-index: 5;
+      display: flex; align-items: center; gap: 9px;
+      font: 700 18px ui-monospace, monospace; color: #fff;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+    }
+    #health .bar {
+      width: 180px; height: 12px; border-radius: 6px;
+      background: rgba(255, 255, 255, 0.18); overflow: hidden;
+    }
+    #health .fill {
+      height: 100%; width: 100%;
+      background: linear-gradient(90deg, #46d36a, #7be38f);
+      transition: width 0.15s ease-out;
+    }
+    #health.low .fill { background: linear-gradient(90deg, #e5413a, #ff7a5c); }
+
+    #damageflash {
+      position: fixed; inset: 0; z-index: 7; pointer-events: none; opacity: 0;
+      background: radial-gradient(ellipse at center,
+        rgba(190, 0, 0, 0) 42%, rgba(190, 0, 0, 0.6) 100%);
+    }
+
+    #killfeed {
+      position: fixed; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6;
+      font: 600 16px system-ui, sans-serif; color: #ffe1a8; white-space: nowrap;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+      opacity: 0; transition: opacity 0.25s ease-out; pointer-events: none;
+    }
+    #killfeed.show { opacity: 1; transition: none; }
+
+    #death {
+      position: fixed; inset: 0; z-index: 8; display: none;
+      flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+      background: rgba(40, 0, 0, 0.35); color: #fff; pointer-events: none;
+      font-family: system-ui, -apple-system, sans-serif; text-align: center;
+    }
+    #death.show { display: flex; }
+    #death h2 { margin: 0; font-size: 40px; letter-spacing: 5px; color: #ff6b6b; }
+    #death .sub { opacity: 0.85; font-size: 15px; }
   </style>
 </head>
 <body>
   <div id="app"></div>
+  <div id="damageflash"></div>
   <div id="crosshair"></div>
   <div id="hitmarker">&#10005;</div>
-  <div id="score">&#8982; 0</div>
+  <div id="score">&#9760; 0</div>
+  <div id="killfeed"></div>
+  <div id="health"><span class="bar"><span class="fill"></span></span><span class="num">100</span></div>
+  <div id="death"><h2>ELIMINATED</h2><div class="sub">Respawning&hellip;</div></div>
   <div id="hud"></div>
   <div id="overlay">
     <h1>FPS&#8209;EARTH</h1>
     <div class="sub">
-      Phase 0 &mdash; a world you can walk around in<br />
-      <b>WASD</b> move &middot; <b>Mouse</b> look &middot; <b>Space</b> jump &middot; <b>Shift</b> sprint &middot; <b>Esc</b> release mouse
+      Phase 1 &mdash; shoot, jump, and play with anyone who joins<br />
+      <b>WASD</b> move &middot; <b>Mouse</b> look &middot; <b>Click</b> shoot &middot; <b>Space</b> jump &middot; <b>Shift</b> sprint &middot; <b>Esc</b> release mouse
     </div>
     <div class="cta">Click anywhere to play</div>
   </div>

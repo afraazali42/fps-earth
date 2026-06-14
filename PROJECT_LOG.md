@@ -41,12 +41,19 @@ Every player streams their position at 20 Hz; the server broadcasts everyone to
 everyone; other players appear as coloured capsules (visor shows facing) with
 smoothing between updates. Offline fallback: no server → single-player, quiet
 retry every 5 s. Verified with three simultaneous clients — movement propagated
-across clients exact to the decimal. **Honest caveat:** v0 is client-authoritative
-(clients are trusted about their position) — fine for friends, replaced by
-server-authoritative physics later in Phase 1.
+across clients exact to the decimal.
 
-**Not built yet:** shooting each other (PvP damage), public servers, rooms via
-link, map editor, accounts.
+**PvP deathmatch (2026-06-14):** you can shoot each other. Remote players now
+carry physics colliders, so the rifle's raycast hits them (and cover still
+blocks). The server owns health (100), death, a 3 s respawn at spread-out spawn
+points, and the kill/death tally; the shooter reports the hit and the server
+applies damage (client sends the amount so live weapon tuning still works in
+PvP). HUD: health bar, red damage flash, kill feed, "ELIMINATED" + respawn
+overlay, and a ☠ kills / ⊗ deaths counter. **Honest caveat:** still
+client-authoritative for both position AND hit detection — fine for friends,
+replaced by the server-authoritative rewrite later in Phase 1.
+
+**Not built yet:** public servers, rooms via shareable link, map editor, accounts.
 
 ## The plan (agreed 2026-06-09)
 
@@ -136,11 +143,30 @@ link, map editor, accounts.
   Screenshot taken of one player seeing another — the milestone shot.
 - Server runs locally only so far: `npm run dev:server`.
 
+### 2026-06-14 — Session 3: PvP deathmatch
+- Built combat networking: remote players got Rapier colliders (`src/remote.ts`),
+  the weapon raycast checks them and reports hits (`src/weapon.ts`), the server
+  tracks health/death/respawn/kills (`server/src/LobbyRoom.ts`), and the HUD
+  gained a health bar, damage flash, kill feed and death overlay (`index.html`,
+  `src/main.ts`). New dev helpers: `dev.self()`, `dev.hitPlayer()`.
+- Verified the kill pipeline at the server level with two driven tabs: A's ray
+  hit B's capsule (impact on B's surface), server applied 4×25 dmg, B died,
+  A.kills=1 / B.deaths=1. Screenshot confirms a second player rendered in-world
+  plus the full combat HUD (health 100, K/D counter, gun).
+- **Test-harness gotcha (not a game bug):** two tabs in one Chrome window means
+  one is always backgrounded; backgrounded tabs throttle timers and Colyseus
+  drops them after ~10 s, so respawn/victim-overlay timing couldn't be observed
+  live (the kill+death themselves verified fine). Real players each have a
+  foreground window, so this won't bite them. Chrome screenshot tool was also
+  throwing transient `clip.scale` errors; the preview-panel screenshot worked.
+- Not yet eyeballed (logic is in & simple): the 3 s respawn and the victim's
+  death overlay — worth a look during your next real two-window playtest.
+
 ### Next session — pick one
-- **A. PvP combat sync:** shoot each other — networked damage, health, death,
-  respawn. Turns presence into an actual deathmatch.
-- **B. Go public:** deploy the server (Railway/Hetzner), rooms joinable via
+- **A. Go public:** deploy the server (Railway/Hetzner), rooms joinable via a
   shareable link — the real "friend joins from their house" moment.
-- **C. Server-authoritative movement** — the anti-cheat foundation; replaces
-  client-trusted positions with server-run physics.
-- **D. Polish:** third-person toggle, name tags, better player models.
+- **B. Server-authoritative movement + hits** — the anti-cheat foundation;
+  replaces client-trusted positions/hits with server-run physics.
+- **C. Game modes / custom rules UI** — a lobby screen to set gravity, speed,
+  damage, score-to-win (the Halo-custom-games soul, made clickable).
+- **D. Polish:** third-person toggle, name tags, better player models, footsteps.

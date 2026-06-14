@@ -3,7 +3,7 @@ import type { Player } from './player';
 import type { GameConfig } from './config';
 import type { TargetManager } from './targets';
 import type { Weapon } from './weapon';
-import type { Net } from './net';
+import type { Net, NetPlayerState } from './net';
 import type { RemotePlayers } from './remote';
 
 /**
@@ -67,6 +67,8 @@ export interface DevTools {
     renderedRemotes: number;
     players: Net['players'];
   };
+  self(): NetPlayerState | undefined;
+  hitPlayer(targetId: string, damage?: number): void;
 }
 
 declare global {
@@ -221,6 +223,15 @@ export function installDevTools(
         renderedRemotes: remotes.count,
         players: netClient.players,
       };
+    },
+
+    self() {
+      return netClient.self();
+    },
+
+    /** Report a hit on another player straight to the server (test helper). */
+    hitPlayer(targetId: string, damage?: number) {
+      netClient.reportHit(targetId, damage ?? config.weapon.damage);
     },
   };
 

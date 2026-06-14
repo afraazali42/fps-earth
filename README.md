@@ -9,9 +9,10 @@ rules are **data, not code** — gravity, speeds, and (eventually) classes, dama
 and win conditions are all live-tunable config, and a custom game type will be a
 shareable file, just like a map.
 
-**Current state: Phase 0** — a first-person character you can walk, sprint and
-jump around a 3D test playground. Built in public; follow the journey in
-[PROJECT_LOG.md](PROJECT_LOG.md).
+**Current state: Phase 1** — a first-person shooter you can play with others: walk,
+sprint, jump and shoot around a 3D playground, with networked deathmatch (health,
+death, respawn, kill/death tally) over a Colyseus server. Built in public; follow
+the journey in [PROJECT_LOG.md](PROJECT_LOG.md).
 
 ## Run it
 

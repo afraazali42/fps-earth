@@ -6,6 +6,8 @@ import type { World } from './world';
 import type { GameConfig } from './config';
 import type { TargetManager } from './targets';
 import type { Sfx } from './audio';
+import type { Net } from './net';
+import type { RemotePlayers } from './remote';
 
 /** UI hooks the weapon calls — wired to DOM elements in main.ts. */
 export interface WeaponUi {
@@ -35,8 +37,9 @@ export class Weapon {
   lastShot: {
     hit: boolean;
     hitTarget: boolean;
+    hitPlayer: boolean;
     point?: { x: number; y: number; z: number };
-  } = { hit: false, hitTarget: false };
+  } = { hit: false, hitTarget: false, hitPlayer: false };
 
   private cooldown = 0;
   private triggerWasDown = false;
@@ -53,6 +56,8 @@ export class Weapon {
     private targets: TargetManager,
     private sfx: Sfx,
     private ui: WeaponUi,
+    private remotes: RemotePlayers,
+    private net: Net,
   ) {
     this.viewmodel = this.buildViewmodel();
     camera.add(this.viewmodel);
@@ -123,9 +128,11 @@ export class Weapon {
       endPoint = new THREE.Vector3(p.x, p.y, p.z);
 
       const target = this.targets.byColliderHandle(hit.collider.handle);
+      const remoteId = this.remotes.playerByColliderHandle(hit.collider.handle);
       this.lastShot = {
         hit: true,
         hitTarget: Boolean(target && target.alive),
+        hitPlayer: Boolean(remoteId),
         point: { x: p.x, y: p.y, z: p.z },
       };
       if (target && target.alive) {
@@ -134,11 +141,17 @@ export class Weapon {
         this.ui.hitmarker(killed);
         if (killed) this.sfx.kill();
         else this.sfx.hit();
+      } else if (remoteId) {
+        // PvP hit: the server applies the damage and decides death. We give
+        // instant local feedback; the kill confirmation arrives via 'kill'.
+        this.net.reportHit(remoteId, this.config.weapon.damage);
+        this.ui.hitmarker(false);
+        this.sfx.hit();
       }
       this.spawnSpark(endPoint);
     } else {
       endPoint = eyePos.clone().addScaledVector(dir, this.config.weapon.range);
-      this.lastShot = { hit: false, hitTarget: false };
+      this.lastShot = { hit: false, hitTarget: false, hitPlayer: false };
     }
 
     const muzzle = MUZZLE_OFFSET.clone().applyEuler(euler).add(eyePos);
