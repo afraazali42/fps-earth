@@ -27,13 +27,21 @@ if ! command -v npm >/dev/null 2>&1; then
   exit 1
 fi
 
-# First run on a fresh machine: install dependencies once.
-if [ ! -d "node_modules" ]; then
-  echo "First run: installing game dependencies (one time, ~1 minute)…"
+# Install dependencies on first run — and refresh them whenever package.json
+# changes (e.g. an update added a new dependency), so the game always starts.
+stale_deps() {
+  # $1 = folder holding package.json. Reinstall if node_modules is missing or
+  # package.json is newer than npm's last-install marker.
+  [ ! -d "$1/node_modules" ] && return 0
+  [ "$1/package.json" -nt "$1/node_modules/.package-lock.json" ] && return 0
+  return 1
+}
+if stale_deps "."; then
+  echo "Installing game dependencies (one time, ~1 minute)…"
   npm install || { echo "Install failed."; read -n 1 -s -r -p "Press any key to close."; exit 1; }
 fi
-if [ ! -d "server/node_modules" ]; then
-  echo "First run: installing server dependencies (one time)…"
+if stale_deps "server"; then
+  echo "Installing server dependencies…"
   npm --prefix server install || { echo "Install failed."; read -n 1 -s -r -p "Press any key to close."; exit 1; }
 fi
 
