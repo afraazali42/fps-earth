@@ -80,6 +80,12 @@ export class World {
     this.blocks.set(block.id, { block, mesh, body });
   }
 
+  /** Replace a block's mesh + collider with new data, keeping its id. */
+  replaceBlock(block: MapBlock): void {
+    this.removeBlock(block.id);
+    this.addBlock(block);
+  }
+
   removeBlock(id: string): void {
     const handle = this.blocks.get(id);
     if (!handle) return;

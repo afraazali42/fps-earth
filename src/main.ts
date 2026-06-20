@@ -228,7 +228,7 @@ async function main() {
     const sw = document.createElement('div');
     sw.className = 'swatch';
     sw.style.background = `#${c.toString(16).padStart(6, '0')}`;
-    sw.addEventListener('click', () => editor.setColorIndex(i));
+    sw.addEventListener('click', () => editor.applyColor(i));
     paletteEl.appendChild(sw);
     swatches.push(sw);
   });
@@ -245,19 +245,19 @@ async function main() {
     const minus = document.createElement('button');
     minus.className = 'cm-step';
     minus.textContent = '−';
-    minus.addEventListener('click', () => editor.adjustSize(axis, -0.5));
+    minus.addEventListener('click', () => editor.applySize(axis, -0.5));
     const val = sizeVals[axis];
     val.className = 'val';
     const plus = document.createElement('button');
     plus.className = 'cm-step';
     plus.textContent = '+';
-    plus.addEventListener('click', () => editor.adjustSize(axis, 0.5));
+    plus.addEventListener('click', () => editor.applySize(axis, 0.5));
     wrap.append(label, minus, val, plus);
     cmSizeEl.appendChild(wrap);
   });
   const rotateBtn = document.createElement('button');
   rotateBtn.textContent = '⟳ Rotate (R)';
-  rotateBtn.addEventListener('click', () => editor.rotate());
+  rotateBtn.addEventListener('click', () => editor.applyRotate());
   cmSizeEl.appendChild(rotateBtn);
 
   undoBtn.addEventListener('click', () => editor.undo());
@@ -265,18 +265,61 @@ async function main() {
   document.querySelector('#clear-btn')!.addEventListener('click', () => editor.clear());
   document.querySelector('#play-btn')!.addEventListener('click', () => setMode('play'));
   document.querySelector('#close-btn')!.addEventListener('click', () => closeCreateMenu());
+  // selection-edit buttons (shown when a block is selected)
+  document.querySelector('#dup-btn')!.addEventListener('click', () => editor.duplicateSelection());
+  document.querySelector('#delsel-btn')!.addEventListener('click', () => editor.deleteSelection());
+  document.querySelector('#deselect-btn')!.addEventListener('click', () => editor.deselect());
+  document.querySelector('#move-btn')!.addEventListener('click', () => {
+    editor.startMove();
+    closeCreateMenu(); // re-lock so the block follows the crosshair; click to drop
+  });
+  document.querySelector('#delsel-btn')!.classList.add('danger');
+
+  const cmTitle = document.querySelector<HTMLHeadingElement>('#cm-title')!;
+  const cmSub = document.querySelector<HTMLDivElement>('#cm-sub')!;
+  const cmShapeLabel = document.querySelector<HTMLDivElement>('#cm-shape-label')!;
+  const cmSelrow = document.querySelector<HTMLDivElement>('#cm-selrow')!;
+  const buildhintEl = document.querySelector<HTMLDivElement>('#buildhint')!;
+  const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
 
   const refreshHud = () => {
+    const sel = editor.selectedBlock;
+    const w = sel ? sel.w : editor.size.w;
+    const h = sel ? sel.h : editor.size.h;
+    const d = sel ? sel.d : editor.size.d;
+    const color = sel ? sel.color : editor.currentColor;
+
     slotEls.forEach((el, i) => el.classList.toggle('active', editor.shapeIndex === i));
     shapeButtons.forEach((b, i) => b.classList.toggle('active', editor.shapeIndex === i));
-    swatches.forEach((s, i) => s.classList.toggle('active', editor.colorIndex === i));
-    hbColor.style.background = `#${editor.currentColor.toString(16).padStart(6, '0')}`;
-    const rot = editor.rotationDeg ? `  ⟳${editor.rotationDeg}°` : '';
-    hbInfo.textContent = `${editor.size.w}×${editor.size.h}×${editor.size.d}${rot}`;
-    sizeVals.w.textContent = String(editor.size.w);
-    sizeVals.h.textContent = String(editor.size.h);
-    sizeVals.d.textContent = String(editor.size.d);
+    const colorIdx = PALETTE.indexOf(color);
+    swatches.forEach((s, i) => s.classList.toggle('active', i === colorIdx));
+    hbColor.style.background = hex(editor.currentColor);
+    sizeVals.w.textContent = String(w);
+    sizeVals.h.textContent = String(h);
+    sizeVals.d.textContent = String(d);
     undoBtn.disabled = !editor.canUndo;
+
+    // hotbar info + hint reflect the mode
+    if (editor.selecting) {
+      hbInfo.textContent = sel ? `selected · ${w}×${h}×${d}` : 'point at a block, click to select';
+      buildhintEl.innerHTML =
+        '<b>Select mode</b> — left-click a block, then <b>E</b> to edit · right-click deselect · <b>Tab</b> build · <b>Esc</b> pause';
+    } else {
+      const rot = editor.rotationDeg ? `  ⟳${editor.rotationDeg}°` : '';
+      hbInfo.textContent = `${editor.size.w}×${editor.size.h}×${editor.size.d}${rot}`;
+      buildhintEl.innerHTML =
+        'Look with mouse · <b>left-click</b> place · <b>right-click</b> remove · <b>E</b> menu · <b>R</b> rotate · <b>Tab</b> select · <b>Esc</b> pause';
+    }
+
+    // creation menu becomes an editor when a block is selected
+    const editing = !!sel;
+    cmTitle.textContent = editing ? 'Edit selected block' : 'Create';
+    cmSub.innerHTML = editing
+      ? 'Change colour, size or rotation — or move, duplicate, delete it.'
+      : 'Pick a shape, colour and size — press <b>E</b> to close and keep building.';
+    cmShapeLabel.style.display = editing ? 'none' : '';
+    cmShapesEl.style.display = editing ? 'none' : 'flex';
+    cmSelrow.classList.toggle('show', editing);
   };
   editor.onChange = refreshHud;
   refreshHud();
@@ -303,12 +346,17 @@ async function main() {
       if (e.code === 'KeyE') {
         e.preventDefault();
         openCreateMenu();
-      } else if (e.code === 'KeyR') editor.rotate();
+      } else if (e.code === 'Tab') {
+        e.preventDefault();
+        editor.setSelecting(!editor.selecting);
+      } else if (e.code === 'KeyR') editor.applyRotate();
       else if (e.code === 'KeyF') editor.setSpawnAtCrosshair();
-      else if (e.code === 'KeyZ' && (e.metaKey || e.ctrlKey)) {
+      else if ((e.code === 'Delete' || e.code === 'Backspace') && editor.hasSelection) {
+        editor.deleteSelection();
+      } else if (e.code === 'KeyZ' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         editor.undo();
-      } else if (/^Digit[1-5]$/.test(e.code)) {
+      } else if (!editor.selecting && /^Digit[1-5]$/.test(e.code)) {
         editor.setShapeIndex(Number(e.code.slice(5)) - 1);
       }
     } else if (mode === 'play') {

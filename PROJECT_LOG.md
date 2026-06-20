@@ -108,13 +108,22 @@ the pause overlay (Esc). Tip for tests: center-crosshair raycast needs no viewpo
 so the preview works without resize, but prime the click edge (release+step) because
 the headless rAF doesn't reset `prevMouse0`.
 
-**Honest editor limits now:** rotation is 90° yaw steps only (no free angles/pitch
-yet → no true ramps/sloped roofs); no select/move existing blocks, duplicate, or
-multi-select yet; practice targets still appear in custom maps; big maps send as
-one JSON blob (may want compression later).
+**Select & edit placed blocks (2026-06-19):** a **Select mode** (Tab) — point the
+crosshair at a block, left-click to select it (cyan edge outline). The creation
+menu (E) then becomes "Edit selected block": **recolor, resize (W/H/D), rotate,
+duplicate, delete, move** (Move makes the block follow the crosshair, click to
+drop; right-click cancels). All edits are undoable (an edit = remove old + add new
+with the same id, via `World.replaceBlock`; the menu's colour/size/rotate controls
+are context-aware via `editor.applyColor/applySize/applyRotate`). Verified in the
+preview: select, recolor (→red), resize (W 2→3), rotate (→90°), duplicate (selects
+the copy), delete, and move ((6,0)→(−8,−8)); screenshot of the Edit menu + outline.
 
-**Not built yet:** select/move/duplicate blocks, free-angle + pitch rotation (ramps),
-a deployed public matchmaker (works locally/LAN now), a TURN relay, accounts.
+**Honest editor limits now:** rotation is 90° yaw steps only (no free angles/pitch
+→ no true ramps/sloped roofs); no multi-select / box-select yet; practice targets
+still appear in custom maps; big maps send as one JSON blob (may want compression).
+
+**Not built yet:** multi-select, free-angle + pitch rotation (ramps), a deployed
+public matchmaker (works locally/LAN now), a TURN relay, accounts.
 
 ## The plan (agreed 2026-06-09)
 
@@ -305,12 +314,18 @@ a deployed public matchmaker (works locally/LAN now), a TURN relay, accounts.
   pointer-lock/menu/pause plumbing. Delivered resize (W/H/D ±) and rotate (A).
 - Verified all ops in the preview + screenshots of build view and the create menu.
 
+### 2026-06-19 — Session 10: select & edit placed blocks
+- Added Select mode (Tab): click a block to select (cyan outline); the E menu
+  becomes "Edit selected block" (recolor/resize/rotate/duplicate/delete/move).
+  `World.replaceBlock` for in-place edits; context-aware applyColor/applySize/
+  applyRotate; undo covers it. Verified every op + screenshot. (Editor is the
+  declared long-term focus; do NOT use the mark_chapter tool — user dislikes it.)
+
 ### Next session — pick one (editor is the focus)
-- **A. Select & edit placed blocks** — point at a block to select it, then move /
-  recolor / resize / delete / duplicate it. The big power-user step; also makes
-  fixing mistakes easy.
-- **B. Ramps & free rotation** — pitch rotation and/or a wedge "Ramp" piece for
-  sloped roofs and ramps (needs free-angle rotation, not just 90° yaw).
+- **A. Ramps & roofs** — pitch/free-angle rotation or a wedge "Ramp" piece for
+  sloped roofs and ramps. Big for "build my house".
+- **B. Multi-select / box-select** — select & move/copy/delete many blocks at once.
+  Power-user speed.
 - **C. Map browser / sharing** — named maps, save/load several, share by code
   (beginnings of the community library).
 - **D. Deploy the matchmaker** — a friend joins from their house over the internet.

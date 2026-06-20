@@ -197,6 +197,9 @@
     }
     .swatch.active { border-color: #fff; transform: scale(1.12); }
     .cm-actions { margin-top: 16px; display: flex; gap: 6px; flex-wrap: wrap; }
+    #cm-selrow { display: none; margin-top: 12px; }
+    #cm-selrow.show { display: flex; }
+    #createmenu button.danger { background: rgba(120, 40, 46, 0.9); color: #ffd7d7; border-color: #8b4d4d; }
   </style>
 </head>
 <body>
@@ -216,14 +219,20 @@
     <span class="hb-info" id="hb-info"></span>
   </div>
   <div id="createmenu">
-    <h3>Create</h3>
-    <div class="cm-sub">Pick a shape, colour and size &mdash; press <b>E</b> to close and keep building.</div>
-    <div class="cm-label">Shape</div>
+    <h3 id="cm-title">Create</h3>
+    <div class="cm-sub" id="cm-sub">Pick a shape, colour and size &mdash; press <b>E</b> to close and keep building.</div>
+    <div class="cm-label" id="cm-shape-label">Shape</div>
     <div class="cm-row" id="cm-shapes"></div>
     <div class="cm-label">Colour</div>
     <div class="cm-row" id="palette"></div>
     <div class="cm-label">Size &amp; rotation</div>
     <div class="cm-row" id="cm-size"></div>
+    <div class="cm-row" id="cm-selrow">
+      <button id="dup-btn">&#9112; Duplicate</button>
+      <button id="move-btn">&#10021; Move</button>
+      <button id="delsel-btn">&#128465; Delete</button>
+      <button id="deselect-btn">Deselect</button>
+    </div>
     <div class="cm-actions">
       <button id="undo-btn">&#8630; Undo</button>
       <button id="spawn-btn">&#9873; Set spawn</button>

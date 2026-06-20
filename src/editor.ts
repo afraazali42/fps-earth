@@ -15,7 +15,6 @@ export interface ShapeDef {
   d: number;
 }
 
-// beginner-friendly building pieces; the size can then be tweaked in the menu
 export const SHAPES: ShapeDef[] = [
   { name: 'Block', w: 2, h: 2, d: 2 },
   { name: 'Slab', w: 4, h: 0.5, d: 4 },
@@ -36,31 +35,38 @@ const MAX_REACH = 120;
 const MAX_UNDO = 100;
 const MIN_SIZE = 0.5;
 const MAX_SIZE = 24;
-
 const CENTER = new THREE.Vector2(0, 0);
 
 /**
- * Build mode — Minecraft-creative feel. You're in first person with a crosshair:
- * move the mouse to look, WASD + Space/Shift to fly, left-click to place a piece
- * where the ghost shows, right-click to remove. R rotates the piece. The shape,
- * colour and size are chosen from the creation menu (opened with E, where the
- * mouse is freed) or the hotbar (number keys). The world interaction stays
- * locked to the crosshair; only the menu frees the cursor.
+ * Build mode — Minecraft-creative feel, with a Select mode for editing what
+ * you've already built.
+ *
+ * Build: first person + crosshair, left-click places the piece, right-click
+ * removes one; the piece's shape/colour/size/rotation come from the hotbar and
+ * the creation menu (E). Select (toggle with Tab): the crosshair highlights a
+ * block; left-click selects it; then the menu recolours / resizes / rotates it,
+ * or you can duplicate, delete, or move it. Everything is undoable.
  */
 export class Editor {
   yaw = 0;
   pitch = -0.3;
+  // brush (placing new blocks)
   shapeIndex = 0;
   colorIndex = 0;
   size = { ...SHAPES[0]! };
-  /** piece rotation about the vertical axis, in 90° steps (0,1,2,3) */
   yawSteps = 0;
-  /** fired after any change so the HUD/menu can refresh */
+  // select / edit
+  selecting = false;
+  selectedId: string | undefined;
+  moving = false;
+
   onChange: (() => void) | null = null;
 
   private raycaster = new THREE.Raycaster();
   private ghost: THREE.Mesh;
   private marker: THREE.Group;
+  private hoverBox: THREE.LineSegments;
+  private selBox: THREE.LineSegments;
   private ghostValid = false;
   private ghostCenter = new THREE.Vector3();
   private hoverBlockId: string | undefined;
@@ -81,6 +87,10 @@ export class Editor {
     this.ghost.visible = false;
     this.world.scene.add(this.ghost);
 
+    this.hoverBox = this.makeOutline(0xffffff, 0.55);
+    this.selBox = this.makeOutline(0x46e0ff, 1);
+    this.world.scene.add(this.hoverBox, this.selBox);
+
     this.marker = this.buildMarker();
     this.marker.visible = false;
     this.world.scene.add(this.marker);
@@ -92,9 +102,15 @@ export class Editor {
   get canUndo(): boolean {
     return this.undoStack.length > 0;
   }
-  /** degrees, for display */
   get rotationDeg(): number {
     return this.yawSteps * 90;
+  }
+  get hasSelection(): boolean {
+    return this.selectedId !== undefined && this.world.getBlock(this.selectedId) !== undefined;
+  }
+  /** A copy of the selected block's data (for the menu display). */
+  get selectedBlock(): MapBlock | undefined {
+    return this.selectedId ? this.world.getBlock(this.selectedId) : undefined;
   }
 
   enter() {
@@ -102,7 +118,6 @@ export class Editor {
     this.pitch = -0.35;
     this.marker.visible = true;
     this.updateMarker();
-    // don't let a held button from the entering click place immediately
     this.prevMouse0 = true;
     this.prevMouse2 = true;
     this.active = true;
@@ -112,16 +127,35 @@ export class Editor {
   exit() {
     this.ghost.visible = false;
     this.marker.visible = false;
+    this.hoverBox.visible = false;
+    this.selBox.visible = false;
     this.active = false;
   }
 
-  /** Stop placing while the creation menu is open (mouse is freed there). */
   setInteractive(on: boolean) {
     this.active = on;
     if (!on) this.ghost.visible = false;
   }
 
-  // --- selection (menu / hotbar) -------------------------------------------
+  // --- mode ----------------------------------------------------------------
+
+  setSelecting(on: boolean) {
+    this.selecting = on;
+    this.moving = false;
+    if (!on) this.deselect();
+    this.ghost.visible = false;
+    this.hoverBox.visible = false;
+    this.onChange?.();
+  }
+
+  deselect() {
+    this.selectedId = undefined;
+    this.selBox.visible = false;
+    this.moving = false;
+    this.onChange?.();
+  }
+
+  // --- brush selection (menu / hotbar) -------------------------------------
 
   setShapeIndex(i: number) {
     if (i < 0 || i >= SHAPES.length) return;
@@ -129,16 +163,78 @@ export class Editor {
     this.size = { ...SHAPES[i]! };
     this.onChange?.();
   }
-  setColorIndex(i: number) {
-    if (i >= 0 && i < PALETTE.length) this.colorIndex = i;
+
+  /** Colour: edits the selection if one is active, else the brush. */
+  applyColor(i: number) {
+    if (i < 0 || i >= PALETTE.length) return;
+    if (this.hasSelection) {
+      this.edit((b) => ({ ...b, color: PALETTE[i]! }));
+    } else {
+      this.colorIndex = i;
+      this.onChange?.();
+    }
+  }
+
+  applySize(axis: 'w' | 'h' | 'd', delta: number) {
+    if (this.hasSelection) {
+      this.edit((b) => ({ ...b, [axis]: clampSize(b[axis] + delta) }));
+    } else {
+      this.size[axis] = clampSize(this.size[axis] + delta);
+      this.onChange?.();
+    }
+  }
+
+  applyRotate() {
+    if (this.hasSelection) {
+      this.edit((b) => {
+        const cur = b.rotation ? b.rotation[1] : 0;
+        const next = (Math.round(cur / (Math.PI / 2)) + 1) % 4;
+        return { ...b, rotation: next === 0 ? undefined : [0, (next * Math.PI) / 2, 0] };
+      });
+    } else {
+      this.yawSteps = (this.yawSteps + 1) % 4;
+      this.onChange?.();
+    }
+  }
+
+  // --- edit the selected block ---------------------------------------------
+
+  deleteSelection() {
+    const block = this.selectedBlock;
+    if (!block || block.locked) return;
+    this.world.removeBlock(block.id);
+    this.pushUndo({ added: [], removed: [{ ...block }] });
+    this.selectedId = undefined;
+    this.selBox.visible = false;
+    this.persist();
     this.onChange?.();
   }
-  adjustSize(axis: 'w' | 'h' | 'd', delta: number) {
-    this.size[axis] = Math.max(MIN_SIZE, Math.min(MAX_SIZE, Math.round((this.size[axis] + delta) * 2) / 2));
+
+  duplicateSelection() {
+    const block = this.selectedBlock;
+    if (!block) return;
+    const copy: MapBlock = { ...block, id: nextBlockId(), x: block.x + (block.w || 2) };
+    delete copy.locked;
+    this.world.addBlock(copy);
+    this.pushUndo({ added: [{ ...copy }], removed: [] });
+    this.selectedId = copy.id;
+    this.persist();
     this.onChange?.();
   }
-  rotate() {
-    this.yawSteps = (this.yawSteps + 1) % 4;
+
+  /** Begin moving the selected block — it follows the crosshair until you click. */
+  startMove() {
+    if (this.hasSelection) this.moving = true;
+  }
+
+  private edit(change: (b: MapBlock) => MapBlock) {
+    const before = this.selectedBlock;
+    if (!before || before.locked) return;
+    const after = change({ ...before });
+    after.id = before.id;
+    this.world.replaceBlock(after);
+    this.pushUndo({ added: [{ ...after }], removed: [{ ...before }] });
+    this.persist();
     this.onChange?.();
   }
 
@@ -147,6 +243,7 @@ export class Editor {
     if (!action) return;
     for (const b of action.added) this.world.removeBlock(b.id);
     for (const b of action.removed) this.world.addBlock(b);
+    if (this.selectedId && !this.world.getBlock(this.selectedId)) this.selectedId = undefined;
     this.persist();
     this.onChange?.();
   }
@@ -156,6 +253,7 @@ export class Editor {
     if (removed.length === 0) return;
     for (const b of removed) this.world.removeBlock(b.id);
     this.pushUndo({ added: [], removed });
+    this.selectedId = undefined;
     this.persist();
     this.onChange?.();
   }
@@ -171,15 +269,13 @@ export class Editor {
   // --- per-frame -----------------------------------------------------------
 
   update(dt: number) {
-    if (!this.active) return; // paused while the creation menu is open
-    // look (only accumulates while pointer-locked, i.e. while building)
+    if (!this.active) return;
     const { dx, dy } = this.input.consumeMouse();
     this.yaw -= dx * LOOK_SENSITIVITY;
     this.pitch -= dy * LOOK_SENSITIVITY;
     const limit = Math.PI / 2 - 0.02;
     this.pitch = Math.max(-limit, Math.min(limit, this.pitch));
 
-    // fly
     const forward = (this.input.down('KeyW') ? 1 : 0) - (this.input.down('KeyS') ? 1 : 0);
     const strafe = (this.input.down('KeyD') ? 1 : 0) - (this.input.down('KeyA') ? 1 : 0);
     const lift = (this.input.down('Space') ? 1 : 0) - (this.input.down('ShiftLeft') ? 1 : 0);
@@ -192,11 +288,30 @@ export class Editor {
     this.applyCamera();
     this.camera.updateMatrixWorld();
 
-    this.updateGhost();
-    this.handleClicks();
+    const m0 = this.input.down('Mouse0');
+    const m2 = this.input.down('Mouse2');
+    const click0 = m0 && !this.prevMouse0;
+    const click2 = m2 && !this.prevMouse2;
+
+    if (this.moving) {
+      this.updateMoveGhost();
+      if (click0) this.commitMove();
+      else if (click2) this.moving = false;
+    } else if (this.selecting) {
+      this.updateHover();
+      if (click0 && this.hoverBlockId) this.select(this.hoverBlockId);
+      else if (click2) this.deselect();
+    } else {
+      this.updateGhost();
+      if (click0 && this.ghostValid) this.placePiece();
+      else if (click2) this.deleteHovered();
+    }
+    this.refreshSelectionBox();
+
+    this.prevMouse0 = m0;
+    this.prevMouse2 = m2;
   }
 
-  /** Aim the editor camera (test helper). */
   setView(yawDeg: number, pitchDeg: number, pos?: [number, number, number]) {
     this.yaw = (yawDeg * Math.PI) / 180;
     this.pitch = (pitchDeg * Math.PI) / 180;
@@ -215,38 +330,80 @@ export class Editor {
     return hit && hit.distance <= MAX_REACH ? hit : undefined;
   }
 
+  private updateHover() {
+    const hit = this.raycastCenter();
+    const id = hit ? (hit.object.userData.blockId as string | undefined) : undefined;
+    const block = id ? this.world.getBlock(id) : undefined;
+    this.hoverBlockId = block && !block.locked ? id : undefined;
+    if (this.hoverBlockId && this.hoverBlockId !== this.selectedId && block) {
+      this.placeOutline(this.hoverBox, block);
+    } else {
+      this.hoverBox.visible = false;
+    }
+  }
+
+  private select(id: string) {
+    this.selectedId = id;
+    this.refreshSelectionBox();
+    this.onChange?.();
+  }
+
+  private refreshSelectionBox() {
+    const block = this.selectedBlock;
+    if (block) this.placeOutline(this.selBox, block);
+    else {
+      this.selBox.visible = false;
+      if (this.selectedId) this.selectedId = undefined;
+    }
+  }
+
+  private updateMoveGhost() {
+    const block = this.selectedBlock;
+    const hit = this.raycastCenter();
+    if (!block || !hit || !hit.face) {
+      this.ghost.visible = false;
+      return;
+    }
+    const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+    const rotY = block.rotation ? block.rotation[1] : 0;
+    const swap = Math.round(rotY / (Math.PI / 2)) % 2 === 1;
+    const ew = swap ? block.d : block.w;
+    const ed = swap ? block.w : block.d;
+    this.placementCenter(hit.point, n, ew, block.h, ed, this.ghostCenter);
+    this.ghost.position.copy(this.ghostCenter);
+    this.ghost.scale.set(block.w, block.h, block.d);
+    this.ghost.rotation.set(0, rotY, 0);
+    (this.ghost.material as THREE.MeshBasicMaterial).color.setHex(block.color);
+    this.ghost.visible = true;
+  }
+
+  private commitMove() {
+    const block = this.selectedBlock;
+    if (!block || !this.ghost.visible) return;
+    this.edit((b) => ({ ...b, x: this.ghostCenter.x, y: this.ghostCenter.y, z: this.ghostCenter.z }));
+    this.moving = false;
+    this.ghost.visible = false;
+  }
+
   private updateGhost() {
     const hit = this.raycastCenter();
     this.hoverBlockId = hit ? (hit.object.userData.blockId as string | undefined) : undefined;
-
     if (!this.active || !hit || !hit.face) {
       this.ghost.visible = false;
       this.ghostValid = false;
       return;
     }
-
     const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
-    // footprint swaps with 90°/270° rotation
     const swap = this.yawSteps % 2 === 1;
     const ew = swap ? this.size.d : this.size.w;
     const ed = swap ? this.size.w : this.size.d;
     this.placementCenter(hit.point, n, ew, this.size.h, ed, this.ghostCenter);
-
     this.ghost.position.copy(this.ghostCenter);
     this.ghost.scale.set(this.size.w, this.size.h, this.size.d);
     this.ghost.rotation.set(0, (this.yawSteps * Math.PI) / 2, 0);
     (this.ghost.material as THREE.MeshBasicMaterial).color.setHex(this.currentColor);
     this.ghost.visible = true;
     this.ghostValid = true;
-  }
-
-  private handleClicks() {
-    const m0 = this.input.down('Mouse0');
-    const m2 = this.input.down('Mouse2');
-    if (this.active && m0 && !this.prevMouse0 && this.ghostValid) this.placePiece();
-    if (this.active && m2 && !this.prevMouse2) this.deleteHovered();
-    this.prevMouse0 = m0;
-    this.prevMouse2 = m2;
   }
 
   private placePiece() {
@@ -262,7 +419,7 @@ export class Editor {
     };
     if (this.yawSteps !== 0) block.rotation = [0, (this.yawSteps * Math.PI) / 2, 0];
     this.world.addBlock(block);
-    this.pushUndo({ added: [block], removed: [] });
+    this.pushUndo({ added: [{ ...block }], removed: [] });
     this.persist();
     this.onChange?.();
   }
@@ -271,14 +428,12 @@ export class Editor {
     if (!this.hoverBlockId) return;
     const block = this.world.getBlock(this.hoverBlockId);
     if (!block || block.locked) return;
-    const copy = { ...block };
     this.world.removeBlock(this.hoverBlockId);
-    this.pushUndo({ added: [], removed: [copy] });
+    this.pushUndo({ added: [], removed: [{ ...block }] });
     this.persist();
     this.onChange?.();
   }
 
-  /** Flush against the clicked surface, snapped to a 1 m grid perpendicular. */
   private placementCenter(p: THREE.Vector3, n: THREE.Vector3, ew: number, h: number, ed: number, out: THREE.Vector3) {
     const ax = Math.abs(n.x);
     const ay = Math.abs(n.y);
@@ -297,6 +452,24 @@ export class Editor {
       out.y = snap(p.y, h);
       out.z = p.z + Math.sign(n.z || 1) * (ed / 2);
     }
+  }
+
+  private placeOutline(outline: THREE.LineSegments, block: MapBlock) {
+    outline.position.set(block.x, block.y, block.z);
+    outline.scale.set(block.w + 0.06, block.h + 0.06, block.d + 0.06);
+    outline.rotation.set(0, block.rotation ? block.rotation[1] : 0, 0);
+    outline.visible = true;
+  }
+
+  private makeOutline(color: number, opacity: number): THREE.LineSegments {
+    const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
+    const seg = new THREE.LineSegments(
+      edges,
+      new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthTest: false }),
+    );
+    seg.renderOrder = 999;
+    seg.visible = false;
+    return seg;
   }
 
   private pushUndo(action: UndoAction) {
@@ -328,4 +501,8 @@ export class Editor {
     group.add(post, ring);
     return group;
   }
+}
+
+function clampSize(v: number): number {
+  return Math.max(MIN_SIZE, Math.min(MAX_SIZE, Math.round(v * 2) / 2));
 }

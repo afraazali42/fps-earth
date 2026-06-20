@@ -92,6 +92,10 @@ export interface DevTools {
   rotate(): number;
   undo(): number;
   clearMap(): number;
+  setSelecting(on: boolean): void;
+  selectedId(): string | undefined;
+  duplicateSel(): void;
+  deleteSel(): void;
 }
 
 declare global {
@@ -322,8 +326,20 @@ export function installDevTools(
       editor.setShapeIndex(i);
     },
     rotate() {
-      editor.rotate();
+      editor.applyRotate();
       return editor.rotationDeg;
+    },
+    setSelecting(on: boolean) {
+      editor.setSelecting(on);
+    },
+    selectedId() {
+      return editor.selectedId;
+    },
+    duplicateSel() {
+      editor.duplicateSelection();
+    },
+    deleteSel() {
+      editor.deleteSelection();
     },
     undo() {
       editor.undo();
