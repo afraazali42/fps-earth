@@ -9,7 +9,7 @@ import { Sfx } from './audio';
 import { Net } from './net';
 import { RemotePlayers } from './remote';
 import { SettingsPanel } from './settings';
-import { Editor, PALETTE } from './editor';
+import { Editor, PALETTE, SHAPES } from './editor';
 import { DEFAULT_CONFIG } from './config';
 import { defaultMap, loadSavedMap } from './gamemap';
 
@@ -153,7 +153,7 @@ async function main() {
   };
 
   const weapon = new Weapon(world, player, camera, input, config, targets, sfx, ui, remotes, net);
-  const editor = new Editor(world, input, camera);
+  const editor = new Editor(world, input, camera, renderer.domElement);
 
   // --- play / build mode switching ----------------------------------------
 
@@ -164,6 +164,8 @@ async function main() {
     document.body.classList.toggle('editing', m === 'edit');
     weapon.setHidden(m === 'edit');
     if (m === 'edit') {
+      // build mode uses a free mouse cursor — release pointer lock
+      if (input.pointerLocked) document.exitPointerLock();
       editor.enter();
     } else {
       editor.exit();
@@ -174,8 +176,56 @@ async function main() {
         // share the freshly-built map with everyone who's joined
         if (net.role === 'host') net.broadcastMap();
       }
+      input.requestLock();
     }
   };
+
+  // --- build-mode toolbar (the primary, discoverable interface) ------------
+
+  const toolsEl = document.querySelector<HTMLDivElement>('#tools')!;
+  const shapesEl = document.querySelector<HTMLDivElement>('#shapes')!;
+  const undoBtn = document.querySelector<HTMLButtonElement>('#undo-btn')!;
+
+  const toolButtons: { el: HTMLButtonElement; tool: 'place' | 'delete' }[] = [];
+  for (const tool of ['place', 'delete'] as const) {
+    const b = document.createElement('button');
+    b.textContent = tool === 'place' ? 'Place' : 'Delete';
+    b.addEventListener('click', () => editor.setTool(tool));
+    toolsEl.appendChild(b);
+    toolButtons.push({ el: b, tool });
+  }
+  const shapeButtons: HTMLButtonElement[] = [];
+  SHAPES.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.textContent = s.name;
+    b.addEventListener('click', () => editor.setShapeIndex(i));
+    shapesEl.appendChild(b);
+    shapeButtons.push(b);
+  });
+  const swatches: HTMLElement[] = [];
+  PALETTE.forEach((c, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'swatch';
+    sw.style.background = `#${c.toString(16).padStart(6, '0')}`;
+    sw.addEventListener('click', () => editor.setColorIndex(i));
+    paletteEl.appendChild(sw);
+    swatches.push(sw);
+  });
+
+  const refreshToolbar = () => {
+    for (const t of toolButtons) t.el.classList.toggle('active', editor.tool === t.tool);
+    shapeButtons.forEach((b, i) => b.classList.toggle('active', editor.shapeIndex === i));
+    swatches.forEach((s, i) => s.classList.toggle('active', editor.colorIndex === i));
+    undoBtn.disabled = !editor.canUndo;
+  };
+  editor.onChange = refreshToolbar;
+
+  undoBtn.addEventListener('click', () => editor.undo());
+  document.querySelector('#spawn-btn')!.addEventListener('click', () => editor.setSpawnAtCursor());
+  document.querySelector('#clear-btn')!.addEventListener('click', () => editor.clear());
+  document.querySelector('#play-btn')!.addEventListener('click', () => setMode('play'));
+  document.querySelector('#menu-btn')!.addEventListener('click', () => overlay.classList.remove('hidden'));
+  refreshToolbar();
 
   // build button only for the host (peers play the host's map)
   buildBtnEl.classList.toggle('hidden', net.role !== 'host');
@@ -183,29 +233,27 @@ async function main() {
     e.stopPropagation();
     overlay.classList.add('hidden');
     setMode('edit');
-    input.requestLock();
   });
 
-  // build the colour palette HUD
-  for (let i = 0; i < PALETTE.length; i++) {
-    const sw = document.createElement('div');
-    sw.className = 'swatch';
-    sw.style.background = `#${PALETTE[i]!.toString(16).padStart(6, '0')}`;
-    sw.innerHTML = `<b>${i + 1}</b>`;
-    paletteEl.appendChild(sw);
-  }
-  const swatches = [...paletteEl.children] as HTMLElement[];
-  const updatePaletteUI = () => {
-    for (let i = 0; i < swatches.length; i++) {
-      swatches[i]!.classList.toggle('active', i === editor.colorIndex);
-    }
-  };
-
-  // quick toggles while playing/building (host only for build)
+  // keyboard accelerators (everything is also clickable in the toolbar)
   window.addEventListener('keydown', (e) => {
-    if (!input.pointerLocked) return;
-    if (e.code === 'Enter' && mode === 'edit') setMode('play');
-    else if (e.code === 'KeyB' && mode === 'play' && net.role === 'host') setMode('edit');
+    if (mode === 'edit') {
+      if (e.code === 'Escape') overlay.classList.remove('hidden');
+      else if (e.code === 'Enter') setMode('play');
+      else if (e.code === 'KeyZ' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        editor.undo();
+      } else if (e.code === 'Tab') {
+        e.preventDefault();
+        editor.setTool(editor.tool === 'place' ? 'delete' : 'place');
+      } else if (e.code === 'KeyF') {
+        editor.setSpawnAtCursor();
+      } else if (/^Digit[1-8]$/.test(e.code)) {
+        editor.setColorIndex(Number(e.code.slice(5)) - 1);
+      }
+    } else if (mode === 'play') {
+      if (e.code === 'KeyB' && net.role === 'host' && input.pointerLocked) setMode('edit');
+    }
   });
 
   // --- combat HUD: health, damage flash, kill feed, death/respawn ----------
@@ -285,17 +333,17 @@ async function main() {
   // lock, which can fail or be unavailable on some devices
   overlay.addEventListener('click', () => {
     overlay.classList.add('hidden');
-    setMode('play');
-    input.requestLock();
+    setMode('play'); // requests pointer lock
   });
-  // clicking the game canvas re-engages pointer lock if it was lost or failed
+  // clicking the game canvas re-engages pointer lock — but ONLY in play mode;
+  // in build mode a click on the canvas places/removes a block instead
   renderer.domElement.addEventListener('click', () => {
-    if (!input.pointerLocked) input.requestLock();
+    if (mode === 'play' && !input.pointerLocked) input.requestLock();
   });
   document.addEventListener('pointerlockchange', () => {
     const locked = document.pointerLockElement !== null;
-    overlay.classList.toggle('hidden', locked);
-    crosshair.classList.toggle('visible', locked);
+    crosshair.classList.toggle('visible', locked && mode === 'play');
+    if (mode === 'play') overlay.classList.toggle('hidden', locked);
   });
 
   window.addEventListener('resize', () => {
@@ -342,7 +390,6 @@ async function main() {
 
     if (mode === 'edit') {
       editor.update(dt);
-      updatePaletteUI();
       renderer.render(world.scene, camera);
     } else {
       player.updateLook();

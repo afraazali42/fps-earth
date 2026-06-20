@@ -7,9 +7,10 @@ import type { Net, NetPlayerState } from './net';
 import type { RemotePlayers } from './remote';
 import type { World } from './world';
 import type { Editor } from './editor';
-import { GRID, nextBlockId, saveMap, loadSavedMap } from './gamemap';
+import { nextBlockId, saveMap, loadSavedMap } from './gamemap';
 
 type Mode = 'play' | 'edit';
+type EditTool = 'place' | 'delete';
 
 /**
  * Dev/testing tools — only installed when running `npm run dev`, never in a
@@ -88,6 +89,10 @@ export interface DevTools {
   editorStep(seconds: number): void;
   reloadMap(): number;
   syncMap(): void;
+  setTool(tool: EditTool): void;
+  setShape(i: number): void;
+  undo(): number;
+  clearMap(): number;
 }
 
 declare global {
@@ -280,16 +285,17 @@ export function installDevTools(
     mapSpawn() {
       return { ...world.spawn };
     },
-    /** Place a block directly at a cell (bypasses aiming) and save. */
+    /** Place a block (current shape) directly at a point (bypasses aiming) and save. */
     placeBlock(x: number, y: number, z: number, color?: number) {
+      const s = editor.currentShape;
       world.addBlock({
         id: nextBlockId(),
         x,
         y,
         z,
-        w: GRID,
-        h: GRID,
-        d: GRID,
+        w: s.w,
+        h: s.h,
+        d: s.d,
         color: color ?? editor.currentColor,
       });
       saveMap(world.toMap());
@@ -313,6 +319,20 @@ export function installDevTools(
     /** Host: push the current map to all peers. */
     syncMap() {
       netClient.broadcastMap();
+    },
+    setTool(tool: EditTool) {
+      editor.setTool(tool);
+    },
+    setShape(i: number) {
+      editor.setShapeIndex(i);
+    },
+    undo() {
+      editor.undo();
+      return world.getBlocks().length;
+    },
+    clearMap() {
+      editor.clear();
+      return world.getBlocks().length;
     },
   };
 

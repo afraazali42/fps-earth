@@ -87,12 +87,28 @@ validates incoming map data. Verified across two separate browsers (so storage
 couldn't cheat): a peer received the host's 18-block map on join, and a live host
 edit (→22) propagated to the peer. The build-and-play-together loop is complete.
 
-**Honest v1 limits:** uniform 2 m cubes only (no slabs/ramps/sizes yet); practice
-targets still appear in custom maps; big maps send as one JSON blob (fine for now,
-may want compression for huge maps later).
+**Editor v2 — free-mouse + toolbar (2026-06-19):** the editor became the declared
+long-term focus ("simple for beginners AND robust for power users"). Reworked from
+FPS-pointer-locked editing to a **free-mouse, visible-toolbar** model (Roblox-Studio-
+like — the right foundation for that goal). Build mode now: a normal cursor (left-
+click places where a ghost shows; right-drag looks; WASD flies), and a bottom
+toolbar with a **Place/Delete tool**, **shapes** (Block, Slab, Wall, Pillar, Small —
+so you can build floors/walls/pillars, not just cubes), an 8-colour palette, and
+**Undo / Spawn / Clear / Play / Menu**. Undo covers place/delete/clear; Clear gives
+a blank canvas (keeps the locked ground). Snapping: flush against the clicked
+surface, 1 m grid on the perpendicular axes. Verified in a real viewport: cursor
+click placement, Slab dims (4×0.5×4), Delete, Undo, Clear, toolbar render.
+**Bug fixed:** cursor→world math used `getBoundingClientRect` which can read 0 in
+odd layout states → now maps from `window.innerWidth/Height` (canvas fills the
+viewport). Testing note: backgrounded browser tabs report a 0×0 viewport, so editor
+cursor tests need the preview tool resized to a real size.
 
-**Not built yet:** a deployed public matchmaker (works locally/LAN now), a TURN
-relay for strict networks, accounts, richer block shapes, a blank-canvas start.
+**Honest v1 limits:** shapes are fixed axis-aligned sizes (no free resize or
+rotation yet — ramps/diagonals to come); practice targets still appear in custom
+maps; big maps send as one JSON blob (may want compression for huge maps later).
+
+**Not built yet:** free block resize + rotation, multi-select/duplicate, a deployed
+public matchmaker (works locally/LAN now), a TURN relay, accounts.
 
 ## The plan (agreed 2026-06-09)
 
@@ -266,11 +282,21 @@ relay for strict networks, accounts, richer block shapes, a blank-canvas start.
   for host+peer tests use the preview client as the (always-active) host and a
   Chrome tab as the peer.
 
-### Next session — pick one
-- **B. Editor depth** — variable block sizes / slabs / ramps, undo, a blank-canvas
-  start ("build my house"), maybe simple textures. Deepens the differentiator.
-- **C. Deploy the matchmaker** — a friend joins from their house over the internet.
-- **D. More rules + game modes** — score-to-win, time limit, teams, more weapons.
-- **E. Polish:** third-person toggle, name tags, footsteps, nicer player models.
-- **F. A map browser / sharing** — save named maps, share a map by code (beginnings
-  of the community map library).
+### 2026-06-19 — Session 8: Editor v2 (free-mouse + toolbar)
+- User set the editor as the long-term focus: simple for beginners + robust for
+  power users. Reworked editor.ts to a free-mouse + toolbar model; index.html got
+  the toolbar (#buildbar); main.ts reworked mode/overlay/pointer-lock so build mode
+  runs unlocked; Input tracks right-click; added shapes, tools, undo, clear.
+- Verified all editor ops in a real viewport (preview resized to 1280×800): cursor
+  placement, shape dims, delete, undo, clear, toolbar. Screenshots of the toolbar +
+  a slab/pillar/wall structure. Fixed the cursor-math 0-rect bug (use window dims).
+
+### Next session — pick one (editor is the focus)
+- **A. Editor depth — resize & rotate** — drag-resize a block, rotate pieces
+  (ramps/diagonals), maybe a properties panel. Biggest step toward "build my house".
+- **B. Editor flow** — select/move existing blocks, duplicate, multi-select, grid
+  options. Power-user speed and precision.
+- **C. Map browser / sharing** — named maps, save/load several, share by code
+  (beginnings of the community library).
+- **D. Deploy the matchmaker** — a friend joins from their house over the internet.
+- **E. Game modes / polish** — score-to-win, teams; or third-person, name tags.
