@@ -140,37 +140,63 @@
 
     #buildhint {
       position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 9;
-      display: none; font-size: 12px; color: rgba(255, 255, 255, 0.7); pointer-events: none;
+      display: none; font-size: 13px; color: rgba(255, 255, 255, 0.75); pointer-events: none;
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); font-family: system-ui, -apple-system, sans-serif;
     }
     body.editing #buildhint { display: block; }
+    body.editing #health, body.editing #score, body.editing #killfeed,
+    body.editing #hitmarker { display: none !important; }
 
-    #buildbar {
-      position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 9;
-      display: none; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center;
-      max-width: 94vw; padding: 8px 12px; border-radius: 12px;
-      background: rgba(14, 18, 28, 0.85); border: 1px solid rgba(120, 150, 210, 0.25);
+    /* hotbar — always visible while building; number keys 1–5 select */
+    #hotbar {
+      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 9;
+      display: none; align-items: center; gap: 10px; pointer-events: none;
       font-family: system-ui, -apple-system, sans-serif;
     }
-    body.editing #buildbar { display: flex; }
-    body.editing #health, body.editing #score, body.editing #killfeed,
-    body.editing #hitmarker, body.editing #crosshair { display: none !important; }
-    .bar-group { display: flex; align-items: center; gap: 6px; }
-    .bar-group + .bar-group { border-left: 1px solid rgba(255, 255, 255, 0.12); padding-left: 14px; }
-    #buildbar button {
-      padding: 6px 11px; border-radius: 7px; cursor: pointer; font: 600 13px system-ui, sans-serif;
+    body.editing #hotbar { display: flex; }
+    #slots { display: flex; gap: 5px; }
+    .slot {
+      min-width: 56px; height: 42px; padding: 0 8px; border-radius: 7px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(14, 18, 28, 0.82); border: 2px solid rgba(255, 255, 255, 0.16);
+      color: #cdddff; font: 600 12px system-ui, sans-serif;
+    }
+    .slot.active { border-color: #fff; background: rgba(40, 60, 96, 0.92); }
+    .slot small { font-size: 9px; opacity: 0.5; }
+    .hb-color { width: 24px; height: 24px; border-radius: 5px; border: 2px solid rgba(255, 255, 255, 0.5); }
+    .hb-info { color: rgba(255, 255, 255, 0.75); font-size: 12px; text-shadow: 0 1px 2px #000; }
+
+    /* creation menu (opened with E) — the mouse is freed here to click choices */
+    #createmenu {
+      position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 11;
+      display: none; width: min(520px, 92vw); padding: 18px 20px; border-radius: 14px;
+      background: rgba(14, 18, 28, 0.97); border: 1px solid rgba(120, 150, 210, 0.3);
+      color: #e8ecf3; font-family: system-ui, -apple-system, sans-serif;
+    }
+    #createmenu.show { display: block; }
+    #createmenu h3 { margin: 0 0 4px; font-size: 16px; }
+    #createmenu .cm-sub { font-size: 12px; opacity: 0.55; margin-bottom: 12px; }
+    .cm-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.5; margin: 12px 0 6px; }
+    .cm-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    #createmenu button {
+      padding: 7px 12px; border-radius: 7px; cursor: pointer; font: 600 13px system-ui, sans-serif;
       background: rgba(40, 52, 78, 0.9); color: #cdddff; border: 1px solid #3a5b9a;
     }
-    #buildbar button:hover:not(:disabled) { background: rgba(58, 74, 110, 0.95); }
-    #buildbar button.active { background: #5b8cff; color: #07101f; border-color: #9fbcff; }
-    #buildbar button:disabled { opacity: 0.4; cursor: default; }
-    #buildbar button.go { background: rgba(46, 110, 60, 0.9); color: #d7ffd9; border-color: #4d8b54; }
+    #createmenu button:hover:not(:disabled) { background: rgba(58, 74, 110, 0.95); }
+    #createmenu button.active { background: #5b8cff; color: #07101f; border-color: #9fbcff; }
+    #createmenu button:disabled { opacity: 0.4; cursor: default; }
+    #createmenu button.go { background: rgba(46, 110, 60, 0.9); color: #d7ffd9; border-color: #4d8b54; }
+    .cm-step { padding: 5px 9px !important; }
+    .cm-axis { display: inline-flex; align-items: center; gap: 3px; margin-right: 4px; }
+    .cm-axis b { opacity: 0.55; font-weight: 700; }
+    .cm-axis .val { min-width: 30px; text-align: center; font-family: ui-monospace, monospace; font-size: 13px; }
     #palette { display: flex; gap: 5px; }
     .swatch {
-      width: 24px; height: 24px; border-radius: 5px; position: relative; cursor: pointer;
+      width: 26px; height: 26px; border-radius: 5px; position: relative; cursor: pointer;
       border: 2px solid rgba(255, 255, 255, 0.25); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
     }
     .swatch.active { border-color: #fff; transform: scale(1.12); }
+    .cm-actions { margin-top: 16px; display: flex; gap: 6px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
@@ -183,17 +209,27 @@
   <div id="killfeed"></div>
   <div id="health"><span class="bar"><span class="fill"></span></span><span class="num">100</span></div>
   <div id="death"><h2>ELIMINATED</h2><div class="sub">Respawning&hellip;</div></div>
-  <div id="buildhint">Left-click to place &middot; right-drag to look &middot; WASD + Space/Shift to fly</div>
-  <div id="buildbar">
-    <div class="bar-group" id="tools"></div>
-    <div class="bar-group" id="shapes"></div>
-    <div class="bar-group" id="palette"></div>
-    <div class="bar-group" id="actions">
+  <div id="buildhint">Move mouse to look &middot; <b>left-click</b> place &middot; <b>right-click</b> remove &middot; <b>E</b> menu &middot; <b>R</b> rotate &middot; <b>Esc</b> pause</div>
+  <div id="hotbar">
+    <div id="slots"></div>
+    <span class="hb-color" id="hb-color"></span>
+    <span class="hb-info" id="hb-info"></span>
+  </div>
+  <div id="createmenu">
+    <h3>Create</h3>
+    <div class="cm-sub">Pick a shape, colour and size &mdash; press <b>E</b> to close and keep building.</div>
+    <div class="cm-label">Shape</div>
+    <div class="cm-row" id="cm-shapes"></div>
+    <div class="cm-label">Colour</div>
+    <div class="cm-row" id="palette"></div>
+    <div class="cm-label">Size &amp; rotation</div>
+    <div class="cm-row" id="cm-size"></div>
+    <div class="cm-actions">
       <button id="undo-btn">&#8630; Undo</button>
-      <button id="spawn-btn">&#9873; Spawn</button>
-      <button id="clear-btn">Clear</button>
-      <button id="play-btn" class="go">&#9658; Play</button>
-      <button id="menu-btn">Menu</button>
+      <button id="spawn-btn">&#9873; Set spawn</button>
+      <button id="clear-btn">Clear all</button>
+      <button id="play-btn" class="go">&#9658; Play map</button>
+      <button id="close-btn">Close</button>
     </div>
   </div>
   <div id="hud"></div>

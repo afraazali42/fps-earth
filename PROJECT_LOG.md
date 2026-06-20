@@ -87,28 +87,34 @@ validates incoming map data. Verified across two separate browsers (so storage
 couldn't cheat): a peer received the host's 18-block map on join, and a live host
 edit (→22) propagated to the peer. The build-and-play-together loop is complete.
 
-**Editor v2 — free-mouse + toolbar (2026-06-19):** the editor became the declared
-long-term focus ("simple for beginners AND robust for power users"). Reworked from
-FPS-pointer-locked editing to a **free-mouse, visible-toolbar** model (Roblox-Studio-
-like — the right foundation for that goal). Build mode now: a normal cursor (left-
-click places where a ghost shows; right-drag looks; WASD flies), and a bottom
-toolbar with a **Place/Delete tool**, **shapes** (Block, Slab, Wall, Pillar, Small —
-so you can build floors/walls/pillars, not just cubes), an 8-colour palette, and
-**Undo / Spawn / Clear / Play / Menu**. Undo covers place/delete/clear; Clear gives
-a blank canvas (keeps the locked ground). Snapping: flush against the clicked
-surface, 1 m grid on the perpendicular axes. Verified in a real viewport: cursor
-click placement, Slab dims (4×0.5×4), Delete, Undo, Clear, toolbar render.
-**Bug fixed:** cursor→world math used `getBoundingClientRect` which can read 0 in
-odd layout states → now maps from `window.innerWidth/Height` (canvas fills the
-viewport). Testing note: backgrounded browser tabs report a 0×0 viewport, so editor
-cursor tests need the preview tool resized to a real size.
+**Editor — the declared long-term focus (2026-06-19):** "simple for beginners AND
+robust for power users." (Session 8 briefly tried a Roblox-Studio free-mouse +
+toolbar model; Session 9 replaced it per the user's preference — see below.)
 
-**Honest v1 limits:** shapes are fixed axis-aligned sizes (no free resize or
-rotation yet — ramps/diagonals to come); practice targets still appear in custom
-maps; big maps send as one JSON blob (may want compression for huge maps later).
+**Editor v3 — Minecraft-creative controls (2026-06-19):** the user asked for the
+editor to feel like **Minecraft creative**, so build mode is now **first-person and
+pointer-locked with a crosshair**: move the mouse to look, WASD + Space/Shift to
+fly, **left-click place**, **right-click remove** (no tool toggle). **E** opens a
+**creation menu** (frees the mouse) to click a shape, colour, **size** (W/H/D ± in
+0.5 steps) and **rotation**; **R** rotates 90°; a bottom **hotbar** (number keys
+1–5) quick-picks shapes; **Esc** is the separate pause menu. Shapes: Block, Slab,
+Wall, Pillar, Small — all resizable + rotatable (rotation stored on the block;
+collider rotates too). This delivers "A" (resize & rotate). Verified in the preview:
+crosshair placement, right-click delete, resize (W 2→3 via menu), rotate (Wall
+stored 4×3×0.5 @90°), shapes, undo, clear, hotbar + create-menu render; screenshots
+of build view and the creation menu. **Pointer-lock plumbing:** E sets a `wantMenu`
+flag then exits lock; `pointerlockchange` shows the create menu if `wantMenu` else
+the pause overlay (Esc). Tip for tests: center-crosshair raycast needs no viewport,
+so the preview works without resize, but prime the click edge (release+step) because
+the headless rAF doesn't reset `prevMouse0`.
 
-**Not built yet:** free block resize + rotation, multi-select/duplicate, a deployed
-public matchmaker (works locally/LAN now), a TURN relay, accounts.
+**Honest editor limits now:** rotation is 90° yaw steps only (no free angles/pitch
+yet → no true ramps/sloped roofs); no select/move existing blocks, duplicate, or
+multi-select yet; practice targets still appear in custom maps; big maps send as
+one JSON blob (may want compression later).
+
+**Not built yet:** select/move/duplicate blocks, free-angle + pitch rotation (ramps),
+a deployed public matchmaker (works locally/LAN now), a TURN relay, accounts.
 
 ## The plan (agreed 2026-06-09)
 
@@ -291,11 +297,20 @@ public matchmaker (works locally/LAN now), a TURN relay, accounts.
   placement, shape dims, delete, undo, clear, toolbar. Screenshots of the toolbar +
   a slab/pillar/wall structure. Fixed the cursor-math 0-rect bug (use window dims).
 
+### 2026-06-19 — Session 9: Minecraft-creative editor controls + resize/rotate
+- User wanted the editor to feel like Minecraft creative (E = creation menu, mouse
+  selects; Esc = pause). Reworked editor.ts back to pointer-locked/crosshair with
+  left=place/right=remove, a hotbar (1–5), an E creation menu (shapes/colours/size/
+  rotate), R rotate. index.html got the hotbar + #createmenu; main.ts reworked the
+  pointer-lock/menu/pause plumbing. Delivered resize (W/H/D ±) and rotate (A).
+- Verified all ops in the preview + screenshots of build view and the create menu.
+
 ### Next session — pick one (editor is the focus)
-- **A. Editor depth — resize & rotate** — drag-resize a block, rotate pieces
-  (ramps/diagonals), maybe a properties panel. Biggest step toward "build my house".
-- **B. Editor flow** — select/move existing blocks, duplicate, multi-select, grid
-  options. Power-user speed and precision.
+- **A. Select & edit placed blocks** — point at a block to select it, then move /
+  recolor / resize / delete / duplicate it. The big power-user step; also makes
+  fixing mistakes easy.
+- **B. Ramps & free rotation** — pitch rotation and/or a wedge "Ramp" piece for
+  sloped roofs and ramps (needs free-angle rotation, not just 90° yaw).
 - **C. Map browser / sharing** — named maps, save/load several, share by code
   (beginnings of the community library).
 - **D. Deploy the matchmaker** — a friend joins from their house over the internet.

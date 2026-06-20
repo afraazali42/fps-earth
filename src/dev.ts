@@ -10,7 +10,6 @@ import type { Editor } from './editor';
 import { nextBlockId, saveMap, loadSavedMap } from './gamemap';
 
 type Mode = 'play' | 'edit';
-type EditTool = 'place' | 'delete';
 
 /**
  * Dev/testing tools — only installed when running `npm run dev`, never in a
@@ -89,8 +88,8 @@ export interface DevTools {
   editorStep(seconds: number): void;
   reloadMap(): number;
   syncMap(): void;
-  setTool(tool: EditTool): void;
   setShape(i: number): void;
+  rotate(): number;
   undo(): number;
   clearMap(): number;
 }
@@ -285,17 +284,16 @@ export function installDevTools(
     mapSpawn() {
       return { ...world.spawn };
     },
-    /** Place a block (current shape) directly at a point (bypasses aiming) and save. */
+    /** Place a block (current size) directly at a point (bypasses aiming) and save. */
     placeBlock(x: number, y: number, z: number, color?: number) {
-      const s = editor.currentShape;
       world.addBlock({
         id: nextBlockId(),
         x,
         y,
         z,
-        w: s.w,
-        h: s.h,
-        d: s.d,
+        w: editor.size.w,
+        h: editor.size.h,
+        d: editor.size.d,
         color: color ?? editor.currentColor,
       });
       saveMap(world.toMap());
@@ -320,11 +318,12 @@ export function installDevTools(
     syncMap() {
       netClient.broadcastMap();
     },
-    setTool(tool: EditTool) {
-      editor.setTool(tool);
-    },
     setShape(i: number) {
       editor.setShapeIndex(i);
+    },
+    rotate() {
+      editor.rotate();
+      return editor.rotationDeg;
     },
     undo() {
       editor.undo();

@@ -73,16 +73,22 @@ LAN host of old.
 
 ### Build mode (host only)
 
-Click **🔨 Build a map** in the menu (or press **B** while playing) to enter the
-editor. It's a free-mouse editor with a toolbar along the bottom:
+Click **🔨 Build a map** in the menu (or press **B** while playing). Build mode
+feels like **Minecraft creative** — first person, with a crosshair:
 
-- **Move the mouse** to aim — a ghost shows where the piece will land; **left-click** to place.
-- The toolbar has a **Place / Delete** tool, **shapes** (Block, Slab, Wall, Pillar, Small),
-  a **colour** palette, and **Undo · Spawn · Clear · Play · Menu** buttons.
-- **Right-drag** to look around; **WASD + Space/Shift** to fly.
+| Control | Action |
+|---|---|
+| Mouse | Look · **left-click** place · **right-click** remove |
+| WASD + Space/Shift | Fly |
+| **E** | Open the **creation menu** (frees the mouse) — pick shape, colour, size, rotation |
+| **R** | Rotate the piece 90° |
+| **1–5** | Pick a shape from the hotbar |
+| **Esc** | Pause menu (separate from the creation menu) |
 
-Optional keyboard shortcuts: `1`–`8` colour · `Tab` toggle tool · `Ctrl/Cmd-Z` undo ·
-`F` set spawn · `Enter` play · `Esc` menu.
+Shapes are **Block, Slab, Wall, Pillar, Small**, and in the creation menu you can
+**resize** any of them (W/H/D) and **rotate** them — so you can build floors,
+walls, pillars, and more. Undo (Ctrl/Cmd-Z) is forgiving; Clear wipes to a blank
+canvas.
 
 Your map saves to the browser automatically, and it **syncs to everyone who
 joins you**: friends receive your map when they connect, and again whenever you
@@ -106,7 +112,7 @@ There's also a `dev.*` API in the browser console for automated testing —
 | [src/config.ts](src/config.ts) | **The game rules as data** — gravity, speeds, jump, damage. Custom game types = copies of this |
 | [src/settings.ts](src/settings.ts) | The host's "Game rules" panel — sliders + presets that edit the live config |
 | [src/gamemap.ts](src/gamemap.ts) | **A map as data** — a list of blocks + spawn; default arena, save/load to the browser |
-| [src/editor.ts](src/editor.ts) | Build mode — free-mouse editor: cursor placement, shapes, tools, undo, clear, palette, spawn |
+| [src/editor.ts](src/editor.ts) | Build mode — Minecraft-creative editor: crosshair place/remove, shapes, resize, rotate, undo, clear |
 | [src/main.ts](src/main.ts) | Boots everything; runs the game loop (60 Hz physics, smooth rendering) |
 | [src/world.ts](src/world.ts) | The 3D scene + physics world; `addBox()` builds the map |
 | [src/player.ts](src/player.ts) | First-person movement: capsule physics, camera, jumping |

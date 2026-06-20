@@ -153,53 +153,74 @@ async function main() {
   };
 
   const weapon = new Weapon(world, player, camera, input, config, targets, sfx, ui, remotes, net);
-  const editor = new Editor(world, input, camera, renderer.domElement);
+  const editor = new Editor(world, input, camera);
+  const createMenu = document.querySelector<HTMLDivElement>('#createmenu')!;
 
-  // --- play / build mode switching ----------------------------------------
+  // --- play / build mode (build = pointer-locked, Minecraft-creative feel) --
 
   let mode: 'play' | 'edit' = 'play';
+  let menuOpen = false; // the creation menu (E) — frees the mouse
+  let wantMenu = false; // distinguishes an E-unlock from an Esc-unlock
+
   const setMode = (m: 'play' | 'edit') => {
     const was = mode;
     mode = m;
     document.body.classList.toggle('editing', m === 'edit');
     weapon.setHidden(m === 'edit');
     if (m === 'edit') {
-      // build mode uses a free mouse cursor — release pointer lock
-      if (input.pointerLocked) document.exitPointerLock();
       editor.enter();
+      input.requestLock();
     } else {
+      menuOpen = false;
+      createMenu.classList.remove('show');
       editor.exit();
       if (was === 'edit') {
-        // dropping in from build mode: start at the map's spawn point
         player.setSpawn(world.spawn.x, world.spawn.y, world.spawn.z);
         player.respawn();
-        // share the freshly-built map with everyone who's joined
         if (net.role === 'host') net.broadcastMap();
       }
       input.requestLock();
     }
   };
 
-  // --- build-mode toolbar (the primary, discoverable interface) ------------
+  const openCreateMenu = () => {
+    wantMenu = true;
+    document.exitPointerLock(); // pointerlockchange then shows the menu
+  };
+  const closeCreateMenu = () => {
+    menuOpen = false;
+    wantMenu = false;
+    createMenu.classList.remove('show');
+    editor.setInteractive(true);
+    input.requestLock();
+  };
 
-  const toolsEl = document.querySelector<HTMLDivElement>('#tools')!;
-  const shapesEl = document.querySelector<HTMLDivElement>('#shapes')!;
+  // --- hotbar (always visible while building; number keys 1–5 select) ------
+
+  const slotsEl = document.querySelector<HTMLDivElement>('#slots')!;
+  const hbColor = document.querySelector<HTMLSpanElement>('#hb-color')!;
+  const hbInfo = document.querySelector<HTMLSpanElement>('#hb-info')!;
+  const slotEls: HTMLElement[] = [];
+  SHAPES.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'slot';
+    el.innerHTML = `<small>${i + 1}</small>${s.name}`;
+    slotsEl.appendChild(el);
+    slotEls.push(el);
+  });
+
+  // --- creation menu contents (shapes, colours, size, rotate, actions) -----
+
+  const cmShapesEl = document.querySelector<HTMLDivElement>('#cm-shapes')!;
+  const cmSizeEl = document.querySelector<HTMLDivElement>('#cm-size')!;
   const undoBtn = document.querySelector<HTMLButtonElement>('#undo-btn')!;
 
-  const toolButtons: { el: HTMLButtonElement; tool: 'place' | 'delete' }[] = [];
-  for (const tool of ['place', 'delete'] as const) {
-    const b = document.createElement('button');
-    b.textContent = tool === 'place' ? 'Place' : 'Delete';
-    b.addEventListener('click', () => editor.setTool(tool));
-    toolsEl.appendChild(b);
-    toolButtons.push({ el: b, tool });
-  }
   const shapeButtons: HTMLButtonElement[] = [];
   SHAPES.forEach((s, i) => {
     const b = document.createElement('button');
     b.textContent = s.name;
     b.addEventListener('click', () => editor.setShapeIndex(i));
-    shapesEl.appendChild(b);
+    cmShapesEl.appendChild(b);
     shapeButtons.push(b);
   });
   const swatches: HTMLElement[] = [];
@@ -211,45 +232,84 @@ async function main() {
     paletteEl.appendChild(sw);
     swatches.push(sw);
   });
-
-  const refreshToolbar = () => {
-    for (const t of toolButtons) t.el.classList.toggle('active', editor.tool === t.tool);
-    shapeButtons.forEach((b, i) => b.classList.toggle('active', editor.shapeIndex === i));
-    swatches.forEach((s, i) => s.classList.toggle('active', editor.colorIndex === i));
-    undoBtn.disabled = !editor.canUndo;
+  const sizeVals: Record<'w' | 'h' | 'd', HTMLSpanElement> = {
+    w: document.createElement('span'),
+    h: document.createElement('span'),
+    d: document.createElement('span'),
   };
-  editor.onChange = refreshToolbar;
+  (['w', 'h', 'd'] as const).forEach((axis) => {
+    const wrap = document.createElement('span');
+    wrap.className = 'cm-axis';
+    const label = document.createElement('b');
+    label.textContent = axis.toUpperCase();
+    const minus = document.createElement('button');
+    minus.className = 'cm-step';
+    minus.textContent = '−';
+    minus.addEventListener('click', () => editor.adjustSize(axis, -0.5));
+    const val = sizeVals[axis];
+    val.className = 'val';
+    const plus = document.createElement('button');
+    plus.className = 'cm-step';
+    plus.textContent = '+';
+    plus.addEventListener('click', () => editor.adjustSize(axis, 0.5));
+    wrap.append(label, minus, val, plus);
+    cmSizeEl.appendChild(wrap);
+  });
+  const rotateBtn = document.createElement('button');
+  rotateBtn.textContent = '⟳ Rotate (R)';
+  rotateBtn.addEventListener('click', () => editor.rotate());
+  cmSizeEl.appendChild(rotateBtn);
 
   undoBtn.addEventListener('click', () => editor.undo());
-  document.querySelector('#spawn-btn')!.addEventListener('click', () => editor.setSpawnAtCursor());
+  document.querySelector('#spawn-btn')!.addEventListener('click', () => editor.setSpawnAtCrosshair());
   document.querySelector('#clear-btn')!.addEventListener('click', () => editor.clear());
   document.querySelector('#play-btn')!.addEventListener('click', () => setMode('play'));
-  document.querySelector('#menu-btn')!.addEventListener('click', () => overlay.classList.remove('hidden'));
-  refreshToolbar();
+  document.querySelector('#close-btn')!.addEventListener('click', () => closeCreateMenu());
+
+  const refreshHud = () => {
+    slotEls.forEach((el, i) => el.classList.toggle('active', editor.shapeIndex === i));
+    shapeButtons.forEach((b, i) => b.classList.toggle('active', editor.shapeIndex === i));
+    swatches.forEach((s, i) => s.classList.toggle('active', editor.colorIndex === i));
+    hbColor.style.background = `#${editor.currentColor.toString(16).padStart(6, '0')}`;
+    const rot = editor.rotationDeg ? `  ⟳${editor.rotationDeg}°` : '';
+    hbInfo.textContent = `${editor.size.w}×${editor.size.h}×${editor.size.d}${rot}`;
+    sizeVals.w.textContent = String(editor.size.w);
+    sizeVals.h.textContent = String(editor.size.h);
+    sizeVals.d.textContent = String(editor.size.d);
+    undoBtn.disabled = !editor.canUndo;
+  };
+  editor.onChange = refreshHud;
+  refreshHud();
 
   // build button only for the host (peers play the host's map)
   buildBtnEl.classList.toggle('hidden', net.role !== 'host');
   buildBtnEl.addEventListener('click', (e) => {
     e.stopPropagation();
     overlay.classList.add('hidden');
-    setMode('edit');
+    if (mode === 'edit') input.requestLock(); // resume building, keep camera
+    else setMode('edit');
   });
 
-  // keyboard accelerators (everything is also clickable in the toolbar)
+  // keyboard: build shortcuts + the play↔build toggle
   window.addEventListener('keydown', (e) => {
     if (mode === 'edit') {
-      if (e.code === 'Escape') overlay.classList.remove('hidden');
-      else if (e.code === 'Enter') setMode('play');
+      if (menuOpen) {
+        if (e.code === 'KeyE' || e.code === 'Escape') {
+          e.preventDefault();
+          closeCreateMenu();
+        }
+        return;
+      }
+      if (e.code === 'KeyE') {
+        e.preventDefault();
+        openCreateMenu();
+      } else if (e.code === 'KeyR') editor.rotate();
+      else if (e.code === 'KeyF') editor.setSpawnAtCrosshair();
       else if (e.code === 'KeyZ' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         editor.undo();
-      } else if (e.code === 'Tab') {
-        e.preventDefault();
-        editor.setTool(editor.tool === 'place' ? 'delete' : 'place');
-      } else if (e.code === 'KeyF') {
-        editor.setSpawnAtCursor();
-      } else if (/^Digit[1-8]$/.test(e.code)) {
-        editor.setColorIndex(Number(e.code.slice(5)) - 1);
+      } else if (/^Digit[1-5]$/.test(e.code)) {
+        editor.setShapeIndex(Number(e.code.slice(5)) - 1);
       }
     } else if (mode === 'play') {
       if (e.code === 'KeyB' && net.role === 'host' && input.pointerLocked) setMode('edit');
@@ -335,15 +395,34 @@ async function main() {
     overlay.classList.add('hidden');
     setMode('play'); // requests pointer lock
   });
-  // clicking the game canvas re-engages pointer lock — but ONLY in play mode;
-  // in build mode a click on the canvas places/removes a block instead
+  // clicking the canvas re-engages pointer lock if it was lost (e.g. lock failed
+  // right after closing the creation menu); while building it also places blocks
   renderer.domElement.addEventListener('click', () => {
-    if (mode === 'play' && !input.pointerLocked) input.requestLock();
+    if (input.pointerLocked) return;
+    if (mode === 'play' || (mode === 'edit' && !menuOpen)) input.requestLock();
   });
   document.addEventListener('pointerlockchange', () => {
     const locked = document.pointerLockElement !== null;
-    crosshair.classList.toggle('visible', locked && mode === 'play');
-    if (mode === 'play') overlay.classList.toggle('hidden', locked);
+    crosshair.classList.toggle('visible', locked);
+    if (locked) {
+      overlay.classList.add('hidden');
+      createMenu.classList.remove('show');
+      if (mode === 'edit') {
+        menuOpen = false;
+        editor.setInteractive(true);
+      }
+    } else if (mode === 'play') {
+      overlay.classList.remove('hidden');
+    } else if (wantMenu) {
+      // E was pressed → show the creation menu and free the mouse
+      wantMenu = false;
+      menuOpen = true;
+      createMenu.classList.add('show');
+      editor.setInteractive(false);
+    } else {
+      // Esc → pause
+      overlay.classList.remove('hidden');
+    }
   });
 
   window.addEventListener('resize', () => {
