@@ -10,6 +10,7 @@ import { Net } from './net';
 import { RemotePlayers } from './remote';
 import { SettingsPanel } from './settings';
 import { Editor, PALETTE, SHAPES } from './editor';
+import { Globe } from './globe';
 import { DEFAULT_CONFIG } from './config';
 import * as mapstore from './mapstore';
 
@@ -154,11 +155,12 @@ async function main() {
 
   const weapon = new Weapon(world, player, camera, input, config, targets, sfx, ui, remotes, net);
   const editor = new Editor(world, input, camera);
+  const globe = new Globe(renderer.domElement);
   const createMenu = document.querySelector<HTMLDivElement>('#createmenu')!;
 
-  // --- play / build mode (build = pointer-locked, Minecraft-creative feel) --
+  // --- play / build / globe mode -------------------------------------------
 
-  let mode: 'play' | 'edit' = 'play';
+  let mode: 'play' | 'edit' | 'globe' = 'play';
   let menuOpen = false; // the creation menu (E) — frees the mouse
   let wantMenu = false; // distinguishes an E-unlock from an Esc-unlock
 
@@ -438,6 +440,62 @@ async function main() {
     }
   });
 
+  // --- globe (host only): your maps as pins on a planet --------------------
+
+  const globeBtn = document.querySelector<HTMLButtonElement>('#globe-btn')!;
+  const fadeEl = document.querySelector<HTMLDivElement>('#fade')!;
+  const pinNameEl = document.querySelector<HTMLDivElement>('#pin-name')!;
+  const globeCurName = document.querySelector<HTMLSpanElement>('#globe-curname')!;
+
+  const updateGlobeCurName = () => {
+    const cur = mapstore.listMaps().find((m) => m.id === mapstore.currentId());
+    globeCurName.textContent = cur ? cur.name : '';
+  };
+
+  const enterGlobe = () => {
+    mode = 'globe';
+    document.body.classList.add('on-globe');
+    document.body.classList.remove('editing');
+    overlay.classList.add('hidden');
+    weapon.setHidden(true);
+    if (input.pointerLocked) document.exitPointerLock();
+    updateGlobeCurName();
+    globe.enter();
+  };
+  const exitGlobe = () => {
+    globe.exit();
+    document.body.classList.remove('on-globe');
+    pinNameEl.classList.remove('show');
+    mode = 'play';
+    overlay.classList.remove('hidden');
+  };
+
+  const fadeThen = (fn: () => void) => {
+    fadeEl.classList.add('show');
+    setTimeout(() => {
+      fn();
+      setTimeout(() => fadeEl.classList.remove('show'), 80);
+    }, 370);
+  };
+
+  globe.onEnterMap = (id) => {
+    fadeThen(() => {
+      loadMapById(id);
+      exitGlobe(); // land on this map's menu — Play to drop in
+    });
+  };
+  globe.onPlaceMap = (lat, lng) => {
+    mapstore.setLocation(mapstore.currentId(), { lat, lng });
+    globe.refreshPins();
+  };
+
+  globeBtn.classList.toggle('hidden', net.role !== 'host');
+  globeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    enterGlobe();
+  });
+  document.querySelector('#globe-back')!.addEventListener('click', () => exitGlobe());
+
   // keyboard: build shortcuts + the play↔build toggle
   window.addEventListener('keydown', (e) => {
     if (mode === 'edit') {
@@ -555,6 +613,7 @@ async function main() {
     if (mode === 'play' || (mode === 'edit' && !menuOpen)) input.requestLock();
   });
   document.addEventListener('pointerlockchange', () => {
+    if (mode === 'globe') return; // globe uses a free cursor; ignore lock changes
     const locked = document.pointerLockElement !== null;
     crosshair.classList.toggle('visible', locked);
     if (locked) {
@@ -620,7 +679,12 @@ async function main() {
     last = now;
     dt = Math.min(dt, 0.1); // returning from a background tab: don't fast-forward
 
-    if (mode === 'edit') {
+    if (mode === 'globe') {
+      globe.update(dt);
+      renderer.render(globe.scene, globe.camera);
+      pinNameEl.textContent = globe.hoveredName;
+      pinNameEl.classList.toggle('show', globe.hoveredName !== '');
+    } else if (mode === 'edit') {
       editor.update(dt);
       renderer.render(world.scene, camera);
     } else {
@@ -659,7 +723,7 @@ async function main() {
       remotes,
       world,
       editor,
-      { get: () => mode, set: setMode },
+      { get: () => (mode === 'globe' ? 'play' : mode), set: setMode },
       { step: stepSimulation, render: renderFrame, draw: () => renderer.render(world.scene, camera) },
     );
     console.log('[fps-earth] dev tools installed — try dev.state() in the console');

@@ -8,15 +8,23 @@ import { type GameMap, defaultMap, blankMap, parseMap } from './gamemap';
  * named map becomes a pin.
  */
 
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
 export interface MapInfo {
   id: string;
   name: string;
+  location?: LatLng;
 }
 
 interface StoredMap {
   id: string;
   name: string;
   map: GameMap;
+  /** where this map is pinned on the globe, if anywhere */
+  location?: LatLng;
 }
 
 const KEY = 'fps-earth-maps';
@@ -38,7 +46,14 @@ function read(): StoredMap[] {
     for (const e of arr) {
       if (e && typeof e.id === 'string' && typeof e.name === 'string') {
         const map = parseMap(e.map);
-        if (map) out.push({ id: e.id, name: e.name, map });
+        if (map) {
+          const stored: StoredMap = { id: e.id, name: e.name, map };
+          const loc = e.location;
+          if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
+            stored.location = { lat: loc.lat, lng: loc.lng };
+          }
+          out.push(stored);
+        }
       }
     }
     return out;
@@ -87,7 +102,17 @@ function ensure(): StoredMap[] {
 }
 
 export function listMaps(): MapInfo[] {
-  return ensure().map((m) => ({ id: m.id, name: m.name }));
+  return ensure().map((m) => ({ id: m.id, name: m.name, location: m.location }));
+}
+
+/** Pin a map on the globe at a location. */
+export function setLocation(id: string, location: LatLng) {
+  const maps = ensure();
+  const m = maps.find((x) => x.id === id);
+  if (m) {
+    m.location = location;
+    write(maps);
+  }
 }
 
 export function currentId(): string {

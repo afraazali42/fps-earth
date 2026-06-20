@@ -104,6 +104,7 @@ export interface DevTools {
   currentMapId(): string;
   exportCurrentCode(): string;
   importMap(code: string): number;
+  setMapLocation(id: string, lat: number, lng: number): void;
 }
 
 declare global {
@@ -386,6 +387,9 @@ export function installDevTools(
       if (!m) return -1;
       mapstore.createMap('Imported', m);
       return mapstore.listMaps().length;
+    },
+    setMapLocation(id: string, lat: number, lng: number) {
+      mapstore.setLocation(id, { lat, lng });
     },
   };
 

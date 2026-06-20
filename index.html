@@ -236,6 +236,37 @@
       background: rgba(0, 0, 0, 0.3); color: #9fd0ff; border: 1px solid #3a5b9a; border-radius: 7px;
       font: 11px ui-monospace, monospace; padding: 8px;
     }
+
+    #globe-btn {
+      margin-top: 2px; padding: 10px 24px; font-size: 15px; cursor: pointer;
+      border: 1px solid #4a7ba8; border-radius: 8px; color: #bfe0f5; font-weight: 600;
+      background: rgba(20, 34, 54, 0.6); font-family: system-ui, -apple-system, sans-serif;
+    }
+    #globe-btn.hidden { display: none; }
+    #globe-back {
+      position: fixed; top: 12px; left: 12px; z-index: 13; display: none;
+      padding: 8px 14px; border-radius: 8px; cursor: pointer; font: 600 14px system-ui, sans-serif;
+      background: rgba(14, 18, 28, 0.85); color: #cdddff; border: 1px solid #3a5b9a;
+    }
+    body.on-globe #globe-back { display: block; }
+    #globe-hint {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 13; display: none;
+      color: rgba(255, 255, 255, 0.8); font: 13px system-ui, -apple-system, sans-serif;
+      text-shadow: 0 1px 3px #000; pointer-events: none; text-align: center; max-width: 92vw;
+    }
+    body.on-globe #globe-hint { display: block; }
+    #globe-curname { color: #ffd24a; }
+    #pin-name {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, 34px); z-index: 13; display: none;
+      color: #fff; font: 700 18px system-ui, -apple-system, sans-serif; text-shadow: 0 1px 4px #000;
+      pointer-events: none; background: rgba(20, 28, 44, 0.7); padding: 4px 12px; border-radius: 8px;
+    }
+    #pin-name.show { display: block; }
+    #fade {
+      position: fixed; inset: 0; z-index: 20; background: #05070d; opacity: 0; pointer-events: none;
+      transition: opacity 0.35s ease;
+    }
+    #fade.show { opacity: 1; }
   </style>
 </head>
 <body>
@@ -289,7 +320,12 @@
     <div class="cta">Click anywhere to play</div>
     <button id="build-btn" class="hidden">&#128296; Build a map</button>
     <button id="maps-btn" class="hidden">&#128193; Maps</button>
+    <button id="globe-btn" class="hidden">&#127757; Globe</button>
   </div>
+  <button id="globe-back">&#8592; Back</button>
+  <div id="globe-hint">Drag to spin &middot; scroll to zoom &middot; click a pin to drop in &middot; click empty land to pin &ldquo;<span id="globe-curname"></span>&rdquo;</div>
+  <div id="pin-name"></div>
+  <div id="fade"></div>
   <div id="mapsmenu">
     <h3>Your maps</h3>
     <div class="cm-sub">Build many places, switch between them, or share one as a code.</div>

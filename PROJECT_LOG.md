@@ -135,10 +135,22 @@ pasted code into a map. Migrates the old single-map key once. Verified: seed/mig
 create + switch (per-map blocks preserved), and a share-code round-trip (3 blocks
 in → 3 out; bad code rejected).
 
-**Honest editor limits now:** ramp rotation is 90° yaw steps (no free pitch angle
-beyond what W/H/D give); no multi-select / box-select yet; practice targets still
-appear in custom maps; share codes are long (the whole map; short codes / a public
-browser need a tiny map service later — the globe's discovery layer).
+**The globe — north-star v1 (2026-06-19):** `src/globe.ts` — a stylised 3D planet
+(canvas-drawn Earth, grid, atmosphere, stars; no external assets) where maps with
+a `location {lat,lng}` (stored in mapstore) appear as **pins**. Drag to spin,
+scroll to zoom, **click a pin → drop into that map** (fade transition → loads it),
+**click empty land → pin the current map** there. A 🌍 Globe button (host) + a
+globe HUD (hint, hovered-pin name, Back). It's a separate Three.js scene/camera
+rendered when `mode==='globe'`. Verified: planet + pins render, click-to-place sets
+the current map's location (center click → lat 0). This is the first crude form of
+"a shared Earth of player-made places" — single-user (your own maps) for now.
+
+**Honest limits now:** globe is single-user (your maps only — browsing OTHERS'
+pins needs an online map directory, the next big thing); stylised planet, not real
+imagery (Cesium/Google 3D tiles later, with cost/terms); dropping into a pin lands
+on that map's menu (a literal fly-straight-in is polish); editor: ramp rotation is
+90° yaw, no multi-select yet; share codes are long (need a map service for short
+codes + a public browse list).
 
 **Not built yet:** multi-select/box-select, a deployed public matchmaker (works
 locally/LAN now), a TURN relay, accounts.
@@ -351,13 +363,18 @@ locally/LAN now), a TURN relay, accounts.
   share-by-code (export/import `FE1:` codes). main.ts/index.html got the modal +
   button. Verified create/switch/per-map persistence + code round-trip.
 
-### Next session — pick one (editor is the focus)
-- **A. Multi-select / box-select** — grab many blocks at once to move/copy/delete.
-  The big power-user/speed step.
-- **B. The globe (rudimentary)** — a textured 3D Earth where maps are pins you
-  click to drop into (the north-star's first crude form; a map's `location` field
-  + a globe lobby browser). Maps now have names/identities to pin. See globe note.
-- **C. Deploy the matchmaker** — a friend joins from their house over the internet.
-- **D. Game modes / polish** — score-to-win, teams; or third-person, name tags.
-- **E. A real map service** — a tiny store so share codes are short and there's a
-  public browse list (also the globe's discovery backend).
+### 2026-06-19 — Session 13: the globe (north-star v1)
+- `src/globe.ts`: stylised 3D planet, maps-as-pins (mapstore `location`), drag/zoom,
+  click pin → drop in (fade), click empty → pin current map. 🌍 button + globe HUD;
+  `mode==='globe'` renders the globe scene. Verified render + click-to-place.
+
+### Next session — pick one
+- **A. Make the globe real** — let a JOINED peer see the host's pins and click one
+  to load that map (globe browsing over P2P); and/or a smoother fly-straight-in
+  transition. Pushes the north-star toward "click a friend's place and drop in".
+- **B. A map service (online directory)** — a tiny store so maps get short codes,
+  a public browse list, and the globe can show OTHER people's pins. The big
+  unlock for the shared-planet vision (and short share codes).
+- **C. Multi-select / box-select** — editor speed (grab many blocks at once).
+- **D. Deploy the matchmaker** — a friend joins from their house over the internet.
+- **E. Game modes / polish** — score-to-win, teams; real Earth imagery (Cesium).
