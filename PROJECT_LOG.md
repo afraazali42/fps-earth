@@ -145,15 +145,31 @@ rendered when `mode==='globe'`. Verified: planet + pins render, click-to-place s
 the current map's location (center click → lat 0). This is the first crude form of
 "a shared Earth of player-made places" — single-user (your own maps) for now.
 
-**Honest limits now:** globe is single-user (your maps only — browsing OTHERS'
-pins needs an online map directory, the next big thing); stylised planet, not real
-imagery (Cesium/Google 3D tiles later, with cost/terms); dropping into a pin lands
-on that map's menu (a literal fly-straight-in is polish); editor: ramp rotation is
-90° yaw, no multi-select yet; share codes are long (need a map service for short
-codes + a public browse list).
+**The map directory — the globe goes shared (2026-06-20):** the server (`server/`)
+now does two jobs on one port: the PeerJS matchmaker (unchanged, still at path `/`)
+PLUS a small **map directory** at `/api` (Express + a single JSON file, `store.ts`,
+gitignored). `src/mapdir.ts` is the client. What it unlocks: **Share** publishes a
+map and gives a **6-character code** (e.g. `7KQ3FP`) instead of the giant blob;
+**Import** fetches a map by code; and the **globe shows OTHER people's shared maps
+as orange pins** beside your yellow ones — click one to pull a copy into your
+library and drop in. Maps de-dupe by (device, mapKey) so re-publishing updates in
+place; a random per-browser `owner` id gates delete. Everything fails soft — if the
+directory is down, Share falls back to the long offline code and the globe just
+shows your local pins. Verified end to end (curl + browser): publish→code,
+re-publish→same code, cross-origin fetch (CORS), Share button→`6SH9TL`,
+Import `2ZN9U6`→map with its pin, load→geometry in world.
 
-**Not built yet:** multi-select/box-select, a deployed public matchmaker (works
-locally/LAN now), a TURN relay, accounts.
+**Honest limits now:** the directory is local-until-deployed (works on your machine
++ same-network friends; a friend across the internet seeing your pins still needs
+the server deployed — same as the matchmaker); no accounts, so ownership is a
+device id (fine for a hobby directory, not griefer-proof); clicking a shared pin
+makes a fresh local copy each time (can duplicate if clicked repeatedly); stylised
+planet, not real imagery (Cesium/Google 3D tiles later); editor: ramp rotation is
+90° yaw, no multi-select yet.
+
+**Not built yet:** multi-select/box-select, a deployed public server (works
+locally/LAN now), a TURN relay, accounts, a list/browse view of the directory
+(the globe is the only browser right now).
 
 ## The plan (agreed 2026-06-09)
 
@@ -368,13 +384,23 @@ locally/LAN now), a TURN relay, accounts.
   click pin → drop in (fade), click empty → pin current map. 🌍 button + globe HUD;
   `mode==='globe'` renders the globe scene. Verified render + click-to-place.
 
+### 2026-06-20 — Session 14: the map directory (the globe goes shared)
+- Server now serves a **map directory** at `/api` (Express + ExpressPeerServer on
+  one port; `store.ts` = one JSON file) alongside the matchmaker. `src/mapdir.ts`
+  client. **Share** → 6-char code (`store` de-dupes by device+map); **Import** →
+  fetch by code; **globe shows others' shared maps as orange pins** → click to copy
+  + drop in. Fails soft if the server's down (offline blob code, local pins only).
+  Verified end to end (curl API + browser CORS, Share/Import buttons, globe pins).
+
 ### Next session — pick one
-- **A. Make the globe real** — let a JOINED peer see the host's pins and click one
-  to load that map (globe browsing over P2P); and/or a smoother fly-straight-in
-  transition. Pushes the north-star toward "click a friend's place and drop in".
-- **B. A map service (online directory)** — a tiny store so maps get short codes,
-  a public browse list, and the globe can show OTHER people's pins. The big
-  unlock for the shared-planet vision (and short share codes).
+- **A. Deploy the server** — put the matchmaker + map directory online so a friend
+  across the internet (not just same-network) can join AND see your globe pins.
+  This is what makes the shared globe truly shared. (Pairs with a TURN relay for
+  the few strict home networks.)
+- **B. A browse view + nicer drop-in** — a scrollable "shared maps" list (the globe
+  is the only browser today), de-dupe re-imported pins, and a literal fly-into-the-
+  pin transition instead of landing on the map's menu.
 - **C. Multi-select / box-select** — editor speed (grab many blocks at once).
-- **D. Deploy the matchmaker** — a friend joins from their house over the internet.
-- **E. Game modes / polish** — score-to-win, teams; real Earth imagery (Cesium).
+- **D. Game modes** — score-to-win, teams, the Halo-custom-games layer.
+- **E. Real Earth imagery** — swap the stylised planet for Cesium/Google 3D tiles
+  (research cost/terms first).

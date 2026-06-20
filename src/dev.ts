@@ -7,8 +7,10 @@ import type { Net, NetPlayerState } from './net';
 import type { RemotePlayers } from './remote';
 import type { World } from './world';
 import type { Editor } from './editor';
+import type { Globe } from './globe';
 import { nextBlockId } from './gamemap';
 import * as mapstore from './mapstore';
+import * as mapdir from './mapdir';
 
 type Mode = 'play' | 'edit';
 
@@ -105,6 +107,12 @@ export interface DevTools {
   exportCurrentCode(): string;
   importMap(code: string): number;
   setMapLocation(id: string, lat: number, lng: number): void;
+  // online map directory + globe
+  dirReachable(): Promise<boolean>;
+  dirPublishCurrent(): Promise<string>;
+  dirList(): Promise<mapdir.DirEntry[]>;
+  dirFetch(code: string): Promise<mapdir.FetchedMap | null>;
+  globePins(): { mine: number; shared: number; names: string[] };
 }
 
 declare global {
@@ -123,6 +131,7 @@ export function installDevTools(
   remotes: RemotePlayers,
   world: World,
   editor: Editor,
+  globe: Globe,
   modeCtl: { get(): Mode; set(m: Mode): void },
   sim: { step(dt: number): void; render(): void; draw(): void },
 ): DevTools {
@@ -390,6 +399,32 @@ export function installDevTools(
     },
     setMapLocation(id: string, lat: number, lng: number) {
       mapstore.setLocation(id, { lat, lng });
+    },
+
+    // --- online map directory + globe ------------------------------------
+
+    dirReachable() {
+      return mapdir.reachable();
+    },
+    /** Publish the current map (with its pin location, if any) → short code. */
+    dirPublishCurrent() {
+      const id = mapstore.currentId();
+      const info = mapstore.listMaps().find((m) => m.id === id);
+      return mapdir.publish({
+        name: info?.name ?? 'Map',
+        map: world.toMap(),
+        mapKey: id,
+        location: info?.location,
+      });
+    },
+    dirList() {
+      return mapdir.listPublic();
+    },
+    dirFetch(code: string) {
+      return mapdir.fetchMap(code);
+    },
+    globePins() {
+      return globe.debugPins();
     },
   };
 

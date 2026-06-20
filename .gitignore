@@ -11,3 +11,6 @@ dist/
 # local env / scratch
 *.local
 .physics-probe/
+
+# map directory storage (the shared-maps JSON the server writes at runtime)
+server/data/

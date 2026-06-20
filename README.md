@@ -17,9 +17,9 @@ host sets the **game rules** — gravity, speeds, jump, damage, fire rate, with
 one-click presets — live for everyone. There's a **Minecraft-style map editor**
 (shapes, resize, rotate, ramps, select-and-edit) — the host builds a map and
 everyone who joins plays it, synced over the peer-to-peer link. You keep a
-**library of named maps**, and a **3D globe** where your maps are pins you click
-to drop into. Built in public;
-follow the journey in [PROJECT_LOG.md](PROJECT_LOG.md).
+**library of named maps** you can **share by a short code**, and a **3D globe**
+where maps — yours and other people's — are pins you click to drop into. Built in
+public; follow the journey in [PROJECT_LOG.md](PROJECT_LOG.md).
 
 ## Run it
 
@@ -45,9 +45,11 @@ can also just press ▶ on the **dev** server in the preview panel.)
   (and a "Copy invite link" button).
 - A friend opens that link (`?host=CODE`) → their browser connects **directly**
   to yours over WebRTC and the game plays peer-to-peer.
-- The only shared infrastructure is a tiny **matchmaker** (`server/`) that helps
-  browsers find each other — it carries no gameplay, so it's basically free to
-  run. `?signal=host:port` points the game at a specific matchmaker.
+- The only shared infrastructure is a tiny server (`server/`): a **matchmaker**
+  that helps browsers find each other (it carries no gameplay) plus a small **map
+  directory** (`/api`) that stores shared maps so they get short codes and appear
+  on the globe. Both run on one port, so it's still basically free to run.
+  `?signal=host:port` points the game at a specific server.
 
 **Game rules (custom games):** the host gets a "Game rules" panel (in the menu,
 and any time via Esc) — gravity, move/sprint speed, jump height, damage, fire
@@ -103,15 +105,19 @@ Undo (Ctrl/Cmd-Z) covers everything; Clear wipes to a blank canvas.
 
 **Map library (📁 Maps in the menu):** keep many named maps, switch between them
 (each saves on its own), rename / duplicate / delete them, and **share one as a
-code** — Share copies a self-contained code you can send a friend, and Import
-turns a pasted code back into a map. The map you're on is what you host, so
+short code** — Share publishes the map and copies a 6-character code (like
+`7KQ3FP`) you can send a friend; Import turns a pasted code back into a map.
+(Older long self-contained codes still import too, and if the directory is
+unreachable Share falls back to one.) The map you're on is what you host, so
 loading a different one swaps what everyone plays.
 
-**Globe (🌍 in the menu):** a 3D planet where your maps are **pins**. Drag to spin,
-scroll to zoom, **click a pin to drop into that map**, or **click empty land to
-pin the map you're on** to that spot. This is the rough first form of the project's
-north-star — a shared Earth of player-made places. (Real photoreal imagery and
-browsing *other people's* pins come later, with a map service.)
+**Globe (🌍 in the menu):** a 3D planet where maps are **pins** — **yours are
+yellow, maps other people have shared are orange**. Drag to spin, scroll to zoom,
+**click a pin to drop into that map** (clicking a shared pin pulls a copy into
+your library), or **click empty land to pin the map you're on** to that spot.
+Publishing a map with Share is what puts it on everyone's globe. This is the first
+real form of the project's north-star — a shared Earth of player-made places.
+(Photoreal imagery comes later.)
 
 Your map saves to the browser automatically, and it **syncs to everyone who
 joins you**: friends receive your map when they connect, and again whenever you
@@ -135,8 +141,9 @@ There's also a `dev.*` API in the browser console for automated testing —
 | [src/config.ts](src/config.ts) | **The game rules as data** — gravity, speeds, jump, damage. Custom game types = copies of this |
 | [src/settings.ts](src/settings.ts) | The host's "Game rules" panel — sliders + presets that edit the live config |
 | [src/gamemap.ts](src/gamemap.ts) | **A map as data** — a list of blocks + spawn; default & blank maps, parse/validate |
-| [src/mapstore.ts](src/mapstore.ts) | The map library — many named maps in the browser, current-map pointer, locations, share codes |
-| [src/globe.ts](src/globe.ts) | The globe — a stylised 3D planet where located maps are pins you click to drop into |
+| [src/mapstore.ts](src/mapstore.ts) | The map library — many named maps in the browser, current-map pointer, locations, offline share codes |
+| [src/mapdir.ts](src/mapdir.ts) | Client for the online map directory — publish a map for a short code, fetch others' shared maps for the globe |
+| [src/globe.ts](src/globe.ts) | The globe — a stylised 3D planet where maps (yours + shared) are pins you click to drop into |
 | [src/editor.ts](src/editor.ts) | Build mode — Minecraft-creative editor: crosshair place/remove, shapes, resize, rotate, select & edit placed blocks, undo |
 | [src/main.ts](src/main.ts) | Boots everything; runs the game loop (60 Hz physics, smooth rendering) |
 | [src/world.ts](src/world.ts) | The 3D scene + physics world; `addBox()` builds the map |
@@ -149,7 +156,7 @@ There's also a `dev.*` API in the browser console for automated testing —
 | [src/peerlink.ts](src/peerlink.ts) | WebRTC peer-to-peer link (PeerJS): host accepts friends, friend connects to host |
 | [src/remote.ts](src/remote.ts) | Renders other players as coloured capsules with hittable colliders, smoothed |
 | [src/input.ts](src/input.ts) | Keyboard/mouse state, pointer lock |
-| [server/](server/src) | The tiny matchmaker / signaling server (PeerServer) — handshake only, no gameplay |
+| [server/](server/src) | The tiny server — matchmaker (PeerServer handshake, no gameplay) + map directory (`/api`, shared maps in one JSON file) |
 
 Project history, decisions and next steps: see [PROJECT_LOG.md](PROJECT_LOG.md).
 

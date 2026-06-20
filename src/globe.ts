@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as mapstore from './mapstore';
+import type { DirEntry } from './mapdir';
 
 const R = 5;
 
@@ -14,11 +15,13 @@ export class Globe {
   scene = new THREE.Scene();
   camera: THREE.PerspectiveCamera;
   onEnterMap: ((id: string) => void) | null = null;
+  onEnterPublic: ((code: string) => void) | null = null;
   onPlaceMap: ((lat: number, lng: number) => void) | null = null;
   hoveredName = '';
 
   private group = new THREE.Group();
   private pins: THREE.Mesh[] = [];
+  private publicMaps: DirEntry[] = [];
   private raycaster = new THREE.Raycaster();
   private dist = 15;
   private dragging = false;
@@ -75,6 +78,12 @@ export class Globe {
     this.canvas.removeEventListener('wheel', this.onWheel);
   }
 
+  /** Others' shared maps (from the directory) to show as pins, besides yours. */
+  setPublicMaps(list: DirEntry[]) {
+    this.publicMaps = list;
+    this.refreshPins();
+  }
+
   refreshPins() {
     for (const pin of this.pins) {
       this.group.remove(pin);
@@ -82,17 +91,43 @@ export class Globe {
       (pin.material as THREE.Material).dispose();
     }
     this.pins = [];
-    for (const info of mapstore.listMaps()) {
-      if (!info.location) continue;
+    const addPin = (lat: number, lng: number, color: number, data: object) => {
       const pin = new THREE.Mesh(
         new THREE.SphereGeometry(0.16, 12, 10),
-        new THREE.MeshBasicMaterial({ color: 0xffd24a }),
+        new THREE.MeshBasicMaterial({ color }),
       );
-      pin.position.copy(latLngToVec(info.location.lat, info.location.lng, R + 0.08));
-      pin.userData = { id: info.id, name: info.name };
+      pin.position.copy(latLngToVec(lat, lng, R + 0.08));
+      pin.userData = data;
       this.group.add(pin);
       this.pins.push(pin);
+    };
+    // your own maps — warm yellow
+    for (const info of mapstore.listMaps()) {
+      if (!info.location) continue;
+      addPin(info.location.lat, info.location.lng, 0xffd24a, { id: info.id, name: info.name });
     }
+    // other people's shared maps — orange
+    for (const e of this.publicMaps) {
+      if (!e.location) continue;
+      addPin(e.location.lat, e.location.lng, 0xff8a3d, {
+        code: e.code,
+        name: e.name,
+        shared: true,
+      });
+    }
+  }
+
+  /** Test helper: how many pins of each kind are currently on the globe. */
+  debugPins(): { mine: number; shared: number; names: string[] } {
+    let mine = 0;
+    let shared = 0;
+    const names: string[] = [];
+    for (const p of this.pins) {
+      if (p.userData.shared) shared++;
+      else mine++;
+      names.push(p.userData.name as string);
+    }
+    return { mine, shared, names };
   }
 
   update(dt: number) {
@@ -158,14 +193,21 @@ export class Globe {
   private updateHover() {
     this.raycaster.setFromCamera(this.cursor, this.camera);
     const hit = this.raycaster.intersectObjects(this.pins, false)[0];
-    this.hoveredName = hit ? (hit.object.userData.name as string) : '';
+    if (!hit) {
+      this.hoveredName = '';
+      return;
+    }
+    const d = hit.object.userData;
+    this.hoveredName = d.shared ? `${d.name as string} · shared` : (d.name as string);
   }
 
   private handleClick() {
     this.raycaster.setFromCamera(this.cursor, this.camera);
     const pinHit = this.raycaster.intersectObjects(this.pins, false)[0];
     if (pinHit) {
-      this.onEnterMap?.(pinHit.object.userData.id as string);
+      const d = pinHit.object.userData;
+      if (d.shared) this.onEnterPublic?.(d.code as string);
+      else this.onEnterMap?.(d.id as string);
       return;
     }
     // empty land — place the current map here

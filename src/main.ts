@@ -13,6 +13,7 @@ import { Editor, PALETTE, SHAPES } from './editor';
 import { Globe } from './globe';
 import { DEFAULT_CONFIG } from './config';
 import * as mapstore from './mapstore';
+import * as mapdir from './mapdir';
 
 const PHYSICS_STEP = 1 / 60; // physics runs at a fixed 60 Hz regardless of display refresh rate
 
@@ -89,6 +90,7 @@ async function main() {
   const hostCode = params.get('host');
   const role: 'host' | 'peer' = hostCode ? 'peer' : 'host';
   const signal = parseSignal(params.get('signal'));
+  mapdir.configure(signal); // point the map directory at the same matchmaker host
   const net = new Net(player, {
     role,
     hostCode: hostCode ?? undefined,
@@ -371,19 +373,41 @@ async function main() {
         if (cls) b.className = cls;
         b.addEventListener('click', fn);
         row.appendChild(b);
+        return b;
       };
       btn('Load', 'load', () => {
         loadMapById(info.id);
         closeMaps();
         setMode('edit');
       });
-      btn('Share', '', () => {
+      // Share publishes the map to the online directory and gives a short code.
+      // If the directory is unreachable, it falls back to the long offline code.
+      const shareBtn = btn('Share', '', async () => {
         const m = mapstore.getMap(info.id);
-        if (m) {
+        if (!m) return;
+        const restore = 'Share';
+        shareBtn.textContent = '…';
+        try {
+          const code = await mapdir.publish({
+            name: info.name,
+            map: m,
+            mapKey: info.id,
+            location: info.location,
+          });
+          codeBox.value = code;
+          try {
+            await navigator.clipboard.writeText(code);
+            shareBtn.textContent = '✓ Code copied';
+          } catch {
+            shareBtn.textContent = '✓ Shared';
+          }
+        } catch {
           codeBox.value = mapstore.exportCode(m);
-          codeBox.focus();
-          codeBox.select();
+          shareBtn.textContent = 'Offline code';
         }
+        codeBox.focus();
+        codeBox.select();
+        setTimeout(() => (shareBtn.textContent = restore), 1800);
       });
       btn('Rename', '', () => {
         const n = prompt('Rename map:', info.name);
@@ -422,8 +446,23 @@ async function main() {
     closeMaps();
     setMode('edit');
   });
-  document.querySelector('#import-btn')!.addEventListener('click', () => {
-    const map = mapstore.importCode(codeBox.value);
+  document.querySelector('#import-btn')!.addEventListener('click', async () => {
+    const raw = codeBox.value.trim();
+    if (!raw) return;
+    // a short 6-char code → fetch the map from the online directory
+    if (mapdir.looksLikeCode(raw)) {
+      const fetched = await mapdir.fetchMap(raw);
+      if (!fetched) {
+        alert("That code didn't match a shared map — check it, or make sure the server is running.");
+        return;
+      }
+      const id = mapstore.createMap(fetched.name || 'Imported map', fetched.map);
+      if (fetched.location) mapstore.setLocation(id, fetched.location);
+      refreshMapList();
+      return;
+    }
+    // otherwise treat it as a long self-contained code
+    const map = mapstore.importCode(raw);
     if (!map) {
       alert("That code didn't work — make sure you pasted the whole thing.");
       return;
@@ -452,6 +491,14 @@ async function main() {
     globeCurName.textContent = cur ? cur.name : '';
   };
 
+  // pull other people's shared maps from the directory and show them as pins
+  // (skip our own — those already show as local yellow pins)
+  const myDevice = mapdir.deviceId();
+  const refreshGlobePublic = async () => {
+    const all = await mapdir.listPublic();
+    globe.setPublicMaps(all.filter((e) => e.location && e.owner !== myDevice));
+  };
+
   const enterGlobe = () => {
     mode = 'globe';
     document.body.classList.add('on-globe');
@@ -461,6 +508,7 @@ async function main() {
     if (input.pointerLocked) document.exitPointerLock();
     updateGlobeCurName();
     globe.enter();
+    void refreshGlobePublic(); // async — pins pop in when the directory replies
   };
   const exitGlobe = () => {
     globe.exit();
@@ -470,10 +518,10 @@ async function main() {
     overlay.classList.remove('hidden');
   };
 
-  const fadeThen = (fn: () => void) => {
+  const fadeThen = (fn: () => void | Promise<void>) => {
     fadeEl.classList.add('show');
-    setTimeout(() => {
-      fn();
+    setTimeout(async () => {
+      await fn();
       setTimeout(() => fadeEl.classList.remove('show'), 80);
     }, 370);
   };
@@ -482,6 +530,19 @@ async function main() {
     fadeThen(() => {
       loadMapById(id);
       exitGlobe(); // land on this map's menu — Play to drop in
+    });
+  };
+  // clicking someone else's pin: pull a copy into your library, pin it where they
+  // had it, load it, and drop onto its menu
+  globe.onEnterPublic = (code) => {
+    fadeThen(async () => {
+      const fetched = await mapdir.fetchMap(code);
+      if (fetched) {
+        const id = mapstore.createMap(fetched.name || 'Shared map', fetched.map);
+        if (fetched.location) mapstore.setLocation(id, fetched.location);
+        loadMapById(id);
+      }
+      exitGlobe();
     });
   };
   globe.onPlaceMap = (lat, lng) => {
@@ -723,6 +784,7 @@ async function main() {
       remotes,
       world,
       editor,
+      globe,
       { get: () => (mode === 'globe' ? 'play' : mode), set: setMode },
       { step: stepSimulation, render: renderFrame, draw: () => renderer.render(world.scene, camera) },
     );
