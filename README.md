@@ -99,6 +99,12 @@ it (Move makes it follow the crosshair — click to drop). Right-click deselects
 
 Undo (Ctrl/Cmd-Z) covers everything; Clear wipes to a blank canvas.
 
+**Map library (📁 Maps in the menu):** keep many named maps, switch between them
+(each saves on its own), rename / duplicate / delete them, and **share one as a
+code** — Share copies a self-contained code you can send a friend, and Import
+turns a pasted code back into a map. The map you're on is what you host, so
+loading a different one swaps what everyone plays.
+
 Your map saves to the browser automatically, and it **syncs to everyone who
 joins you**: friends receive your map when they connect, and again whenever you
 return from build mode — so you build, hit Enter, and your friends are playing
@@ -120,7 +126,8 @@ There's also a `dev.*` API in the browser console for automated testing —
 |---|---|
 | [src/config.ts](src/config.ts) | **The game rules as data** — gravity, speeds, jump, damage. Custom game types = copies of this |
 | [src/settings.ts](src/settings.ts) | The host's "Game rules" panel — sliders + presets that edit the live config |
-| [src/gamemap.ts](src/gamemap.ts) | **A map as data** — a list of blocks + spawn; default arena, save/load to the browser |
+| [src/gamemap.ts](src/gamemap.ts) | **A map as data** — a list of blocks + spawn; default & blank maps, parse/validate |
+| [src/mapstore.ts](src/mapstore.ts) | The map library — many named maps in the browser, current-map pointer, share codes |
 | [src/editor.ts](src/editor.ts) | Build mode — Minecraft-creative editor: crosshair place/remove, shapes, resize, rotate, select & edit placed blocks, undo |
 | [src/main.ts](src/main.ts) | Boots everything; runs the game loop (60 Hz physics, smooth rendering) |
 | [src/world.ts](src/world.ts) | The 3D scene + physics world; `addBox()` builds the map |

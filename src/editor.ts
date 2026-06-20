@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import type { Input } from './input';
 import { World, rampGeometry } from './world';
-import { nextBlockId, saveMap, type MapBlock } from './gamemap';
+import { nextBlockId, type MapBlock } from './gamemap';
+import { saveCurrent } from './mapstore';
 
 // a friendly building palette (also shown as clickable swatches in the menu)
 export const PALETTE = [
@@ -494,7 +495,7 @@ export class Editor {
   }
 
   private persist() {
-    saveMap(this.world.toMap());
+    saveCurrent(this.world.toMap());
   }
 
   private updateMarker() {

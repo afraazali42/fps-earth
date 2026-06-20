@@ -125,9 +125,20 @@ climbed it, y 0.92→2.71 along the slope), **resizable** (W/H/D set the slope) 
 **rotatable** (yaw, to aim it). Two ramps back-to-back = a peaked roof. The editor
 ghost shows the wedge; hotbar is now 6 shapes (number keys 1–6).
 
+**Map library (2026-06-19):** `src/mapstore.ts` — many named maps in the browser
+(was a single map). One map is "current": the editor auto-saves to it, the game
+loads it, and it's what you host (loading another swaps what peers play). A **📁
+Maps** menu (host) lists maps with Load / Share / Rename / Copy / Delete, a New-map
+(blank canvas) button, and **share-by-code**: Share exports a self-contained `FE1:`
+code (base64 of the map JSON — the map IS the code, no server), Import turns a
+pasted code into a map. Migrates the old single-map key once. Verified: seed/migrate,
+create + switch (per-map blocks preserved), and a share-code round-trip (3 blocks
+in → 3 out; bad code rejected).
+
 **Honest editor limits now:** ramp rotation is 90° yaw steps (no free pitch angle
 beyond what W/H/D give); no multi-select / box-select yet; practice targets still
-appear in custom maps; big maps send as one JSON blob.
+appear in custom maps; share codes are long (the whole map; short codes / a public
+browser need a tiny map service later — the globe's discovery layer).
 
 **Not built yet:** multi-select/box-select, a deployed public matchmaker (works
 locally/LAN now), a TURN relay, accounts.
@@ -334,12 +345,19 @@ locally/LAN now), a TURN relay, accounts.
   `rampGeometry`/`rampPoints` in world.ts; editor ghost + 6th hotbar slot.
   Verified placement, type, AND walkability (player climbed it).
 
+### 2026-06-19 — Session 12: map library & share codes
+- `src/mapstore.ts`: many named maps + current-map pointer + migration; editor/dev
+  auto-save to the current map; 📁 Maps menu (list/new/load/rename/copy/delete) and
+  share-by-code (export/import `FE1:` codes). main.ts/index.html got the modal +
+  button. Verified create/switch/per-map persistence + code round-trip.
+
 ### Next session — pick one (editor is the focus)
 - **A. Multi-select / box-select** — grab many blocks at once to move/copy/delete.
   The big power-user/speed step.
-- **B. Map browser / sharing** — save several named maps, share by code (the start
-  of a community library; also the on-ramp to the globe vision).
-- **C. The globe (rudimentary)** — a textured 3D Earth where maps are pins you
-  click to drop into. The north-star, first crude version. (See globe vision note.)
-- **D. Deploy the matchmaker** — a friend joins from their house over the internet.
-- **E. Game modes / polish** — score-to-win, teams; or third-person, name tags.
+- **B. The globe (rudimentary)** — a textured 3D Earth where maps are pins you
+  click to drop into (the north-star's first crude form; a map's `location` field
+  + a globe lobby browser). Maps now have names/identities to pin. See globe note.
+- **C. Deploy the matchmaker** — a friend joins from their house over the internet.
+- **D. Game modes / polish** — score-to-win, teams; or third-person, name tags.
+- **E. A real map service** — a tiny store so share codes are short and there's a
+  public browse list (also the globe's discovery backend).

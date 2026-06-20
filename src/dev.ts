@@ -7,7 +7,8 @@ import type { Net, NetPlayerState } from './net';
 import type { RemotePlayers } from './remote';
 import type { World } from './world';
 import type { Editor } from './editor';
-import { nextBlockId, saveMap, loadSavedMap } from './gamemap';
+import { nextBlockId } from './gamemap';
+import * as mapstore from './mapstore';
 
 type Mode = 'play' | 'edit';
 
@@ -96,6 +97,13 @@ export interface DevTools {
   selectedId(): string | undefined;
   duplicateSel(): void;
   deleteSel(): void;
+  // map library
+  mapList(): { id: string; name: string }[];
+  newMap(name: string): string;
+  loadMapId(id: string): number;
+  currentMapId(): string;
+  exportCurrentCode(): string;
+  importMap(code: string): number;
 }
 
 declare global {
@@ -302,7 +310,7 @@ export function installDevTools(
         ...(editor.currentType ? { type: editor.currentType } : {}),
       };
       world.addBlock(block);
-      saveMap(world.toMap());
+      mapstore.saveCurrent(world.toMap());
       return world.getBlocks().length;
     },
     editorView(yawDeg: number, pitchDeg: number, pos?: [number, number, number]) {
@@ -314,10 +322,9 @@ export function installDevTools(
       for (let i = 0; i < ticks; i++) editor.update(1 / 60);
       sim.draw();
     },
-    /** Reload the map from browser storage (test persistence). */
+    /** Reload the current map from browser storage (test persistence). */
     reloadMap() {
-      const m = loadSavedMap();
-      if (m) world.loadMap(m);
+      world.loadMap(mapstore.currentMap());
       return world.getBlocks().length;
     },
     /** Host: push the current map to all peers. */
@@ -350,6 +357,35 @@ export function installDevTools(
     clearMap() {
       editor.clear();
       return world.getBlocks().length;
+    },
+
+    // --- map library ------------------------------------------------------
+
+    mapList() {
+      return mapstore.listMaps();
+    },
+    newMap(name: string) {
+      return mapstore.createMap(name);
+    },
+    loadMapId(id: string) {
+      const m = mapstore.getMap(id);
+      if (m) {
+        mapstore.setCurrent(id);
+        world.loadMap(m);
+      }
+      return world.getBlocks().length;
+    },
+    currentMapId() {
+      return mapstore.currentId();
+    },
+    exportCurrentCode() {
+      return mapstore.exportCode(world.toMap());
+    },
+    importMap(code: string) {
+      const m = mapstore.importCode(code);
+      if (!m) return -1;
+      mapstore.createMap('Imported', m);
+      return mapstore.listMaps().length;
     },
   };
 

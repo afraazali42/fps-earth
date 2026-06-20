@@ -80,6 +80,14 @@ export function defaultMap(): GameMap {
   return { blocks, spawn: { x: 0, y: 2, z: 14 } };
 }
 
+/** A near-empty map — just the ground — for starting a fresh build. */
+export function blankMap(): GameMap {
+  return {
+    blocks: [{ id: nextBlockId(), x: 0, y: -0.5, z: 0, w: 80, h: 1, d: 80, color: 0x49845c, locked: true }],
+    spawn: { x: 0, y: 2, z: 0 },
+  };
+}
+
 const STORAGE_KEY = 'fps-earth-map-v1';
 
 export function saveMap(map: GameMap): void {

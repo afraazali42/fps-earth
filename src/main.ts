@@ -11,7 +11,7 @@ import { RemotePlayers } from './remote';
 import { SettingsPanel } from './settings';
 import { Editor, PALETTE, SHAPES } from './editor';
 import { DEFAULT_CONFIG } from './config';
-import { defaultMap, loadSavedMap } from './gamemap';
+import * as mapstore from './mapstore';
 
 const PHYSICS_STEP = 1 / 60; // physics runs at a fixed 60 Hz regardless of display refresh rate
 
@@ -69,8 +69,8 @@ async function main() {
     targets: { ...DEFAULT_CONFIG.targets },
   };
 
-  // load the saved map if there is one, otherwise the starter arena
-  const startingMap = loadSavedMap() ?? defaultMap();
+  // load whichever map is current in the library (migrates the old format)
+  const startingMap = mapstore.currentMap();
 
   const input = new Input(document.body);
   const world = new World(config, startingMap);
@@ -331,6 +331,111 @@ async function main() {
     overlay.classList.add('hidden');
     if (mode === 'edit') input.requestLock(); // resume building, keep camera
     else setMode('edit');
+  });
+
+  // --- map library (host only) ---------------------------------------------
+
+  const mapsBtn = document.querySelector<HTMLButtonElement>('#maps-btn')!;
+  const mapsMenu = document.querySelector<HTMLDivElement>('#mapsmenu')!;
+  const mapListEl = document.querySelector<HTMLDivElement>('#map-list')!;
+  const codeBox = document.querySelector<HTMLTextAreaElement>('#code-box')!;
+  mapsMenu.addEventListener('click', (e) => e.stopPropagation());
+
+  const loadMapById = (id: string) => {
+    const map = mapstore.getMap(id);
+    if (!map) return;
+    mapstore.setCurrent(id);
+    world.loadMap(map);
+    editor.deselect();
+    player.setSpawn(world.spawn.x, world.spawn.y, world.spawn.z);
+    if (net.role === 'host' && net.connected) net.broadcastMap();
+  };
+
+  const closeMaps = () => mapsMenu.classList.remove('show');
+
+  const refreshMapList = () => {
+    const cur = mapstore.currentId();
+    mapListEl.replaceChildren();
+    for (const info of mapstore.listMaps()) {
+      const row = document.createElement('div');
+      row.className = info.id === cur ? 'map-row current' : 'map-row';
+      const name = document.createElement('span');
+      name.className = 'map-name';
+      name.textContent = info.name;
+      row.appendChild(name);
+      const btn = (label: string, cls: string, fn: () => void) => {
+        const b = document.createElement('button');
+        b.textContent = label;
+        if (cls) b.className = cls;
+        b.addEventListener('click', fn);
+        row.appendChild(b);
+      };
+      btn('Load', 'load', () => {
+        loadMapById(info.id);
+        closeMaps();
+        setMode('edit');
+      });
+      btn('Share', '', () => {
+        const m = mapstore.getMap(info.id);
+        if (m) {
+          codeBox.value = mapstore.exportCode(m);
+          codeBox.focus();
+          codeBox.select();
+        }
+      });
+      btn('Rename', '', () => {
+        const n = prompt('Rename map:', info.name);
+        if (n) {
+          mapstore.renameMap(info.id, n);
+          refreshMapList();
+        }
+      });
+      btn('Copy', '', () => {
+        mapstore.duplicateMap(info.id);
+        refreshMapList();
+      });
+      btn('Delete', 'danger', () => {
+        if (!confirm(`Delete "${info.name}"? This can't be undone.`)) return;
+        const wasCurrent = info.id === mapstore.currentId();
+        mapstore.deleteMap(info.id);
+        if (wasCurrent) loadMapById(mapstore.currentId());
+        refreshMapList();
+      });
+      mapListEl.appendChild(row);
+    }
+  };
+
+  mapsBtn.classList.toggle('hidden', net.role !== 'host');
+  mapsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    codeBox.value = '';
+    refreshMapList();
+    mapsMenu.classList.add('show');
+  });
+  document.querySelector('#maps-close-btn')!.addEventListener('click', () => closeMaps());
+  document.querySelector('#newmap-btn')!.addEventListener('click', () => {
+    const name = prompt('Name your new map:', 'New map');
+    if (name === null) return;
+    loadMapById(mapstore.createMap(name));
+    closeMaps();
+    setMode('edit');
+  });
+  document.querySelector('#import-btn')!.addEventListener('click', () => {
+    const map = mapstore.importCode(codeBox.value);
+    if (!map) {
+      alert("That code didn't work — make sure you pasted the whole thing.");
+      return;
+    }
+    mapstore.createMap('Imported map', map);
+    refreshMapList();
+  });
+  document.querySelector('#copycode-btn')!.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(codeBox.value);
+    } catch {
+      codeBox.focus();
+      codeBox.select();
+    }
   });
 
   // keyboard: build shortcuts + the play↔build toggle
