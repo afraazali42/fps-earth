@@ -288,9 +288,9 @@ export function installDevTools(
     mapSpawn() {
       return { ...world.spawn };
     },
-    /** Place a block (current size) directly at a point (bypasses aiming) and save. */
+    /** Place a block (current size + shape type) directly at a point and save. */
     placeBlock(x: number, y: number, z: number, color?: number) {
-      world.addBlock({
+      const block = {
         id: nextBlockId(),
         x,
         y,
@@ -299,7 +299,9 @@ export function installDevTools(
         h: editor.size.h,
         d: editor.size.d,
         color: color ?? editor.currentColor,
-      });
+        ...(editor.currentType ? { type: editor.currentType } : {}),
+      };
+      world.addBlock(block);
       saveMap(world.toMap());
       return world.getBlocks().length;
     },

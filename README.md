@@ -86,9 +86,11 @@ feels like **Minecraft creative** — first person, with a crosshair:
 | **Tab** | Toggle **Select mode** (edit placed blocks) |
 | **Esc** | Pause menu (separate from the creation menu) |
 
-Shapes are **Block, Slab, Wall, Pillar, Small**, and in the creation menu you can
-**resize** any of them (W/H/D) and **rotate** them — so you can build floors,
-walls, pillars, and more.
+Shapes are **Block, Slab, Wall, Pillar, Small** and **Ramp**, and in the creation
+menu you can **resize** any of them (W/H/D) and **rotate** them — so you can build
+floors, walls, pillars, and more. The **Ramp** is a solid, walkable wedge:
+resizing it sets the slope, rotating aims it, and two ramps back-to-back make a
+peaked roof.
 
 **Select mode (Tab):** point the crosshair at a block and left-click to select it
 (it gets a cyan outline). The creation menu becomes an **"Edit selected block"**

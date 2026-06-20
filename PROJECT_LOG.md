@@ -118,12 +118,19 @@ are context-aware via `editor.applyColor/applySize/applyRotate`). Verified in th
 preview: select, recolor (→red), resize (W 2→3), rotate (→90°), duplicate (selects
 the copy), delete, and move ((6,0)→(−8,−8)); screenshot of the Edit menu + outline.
 
-**Honest editor limits now:** rotation is 90° yaw steps only (no free angles/pitch
-→ no true ramps/sloped roofs); no multi-select / box-select yet; practice targets
-still appear in custom maps; big maps send as one JSON blob (may want compression).
+**Ramps & roofs (2026-06-19):** a **Ramp** shape — a solid right-triangle-prism
+wedge (`rampGeometry`/`rampPoints` in world.ts; `MapBlock.type='ramp'`; mesh +
+**Rapier convexHull collider**). It's genuinely **walkable** (verified: a player
+climbed it, y 0.92→2.71 along the slope), **resizable** (W/H/D set the slope) and
+**rotatable** (yaw, to aim it). Two ramps back-to-back = a peaked roof. The editor
+ghost shows the wedge; hotbar is now 6 shapes (number keys 1–6).
 
-**Not built yet:** multi-select, free-angle + pitch rotation (ramps), a deployed
-public matchmaker (works locally/LAN now), a TURN relay, accounts.
+**Honest editor limits now:** ramp rotation is 90° yaw steps (no free pitch angle
+beyond what W/H/D give); no multi-select / box-select yet; practice targets still
+appear in custom maps; big maps send as one JSON blob.
+
+**Not built yet:** multi-select/box-select, a deployed public matchmaker (works
+locally/LAN now), a TURN relay, accounts.
 
 ## The plan (agreed 2026-06-09)
 
@@ -321,12 +328,18 @@ public matchmaker (works locally/LAN now), a TURN relay, accounts.
   applyRotate; undo covers it. Verified every op + screenshot. (Editor is the
   declared long-term focus; do NOT use the mark_chapter tool — user dislikes it.)
 
+### 2026-06-19 — Session 11: ramps & roofs
+- Added a Ramp shape: solid walkable wedge (convex-hull collider), resizable for
+  slope, rotatable to aim; two ramps = a roof. `MapBlock.type='ramp'`;
+  `rampGeometry`/`rampPoints` in world.ts; editor ghost + 6th hotbar slot.
+  Verified placement, type, AND walkability (player climbed it).
+
 ### Next session — pick one (editor is the focus)
-- **A. Ramps & roofs** — pitch/free-angle rotation or a wedge "Ramp" piece for
-  sloped roofs and ramps. Big for "build my house".
-- **B. Multi-select / box-select** — select & move/copy/delete many blocks at once.
-  Power-user speed.
-- **C. Map browser / sharing** — named maps, save/load several, share by code
-  (beginnings of the community library).
+- **A. Multi-select / box-select** — grab many blocks at once to move/copy/delete.
+  The big power-user/speed step.
+- **B. Map browser / sharing** — save several named maps, share by code (the start
+  of a community library; also the on-ramp to the globe vision).
+- **C. The globe (rudimentary)** — a textured 3D Earth where maps are pins you
+  click to drop into. The north-star, first crude version. (See globe vision note.)
 - **D. Deploy the matchmaker** — a friend joins from their house over the internet.
 - **E. Game modes / polish** — score-to-win, teams; or third-person, name tags.

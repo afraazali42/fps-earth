@@ -17,6 +17,8 @@ export interface MapBlock {
   color: number;
   /** euler rotation in radians (default map can hold angled pieces) */
   rotation?: [number, number, number];
+  /** 'ramp' = a solid walkable wedge; default (undefined) = a box */
+  type?: 'ramp';
   /** locked blocks (e.g. the ground) can't be deleted in the editor */
   locked?: boolean;
 }
@@ -139,6 +141,7 @@ export function parseMap(data: unknown): GameMap | null {
     if (Array.isArray(b.rotation) && b.rotation.length === 3 && b.rotation.every(num)) {
       block.rotation = [b.rotation[0], b.rotation[1], b.rotation[2]] as [number, number, number];
     }
+    if (b.type === 'ramp') block.type = 'ramp';
     if (b.locked === true) block.locked = true;
     blocks.push(block);
   }

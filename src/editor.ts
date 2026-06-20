@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Input } from './input';
-import type { World } from './world';
+import { World, rampGeometry } from './world';
 import { nextBlockId, saveMap, type MapBlock } from './gamemap';
 
 // a friendly building palette (also shown as clickable swatches in the menu)
@@ -13,6 +13,7 @@ export interface ShapeDef {
   w: number;
   h: number;
   d: number;
+  type?: 'ramp';
 }
 
 export const SHAPES: ShapeDef[] = [
@@ -21,6 +22,7 @@ export const SHAPES: ShapeDef[] = [
   { name: 'Wall', w: 4, h: 3, d: 0.5 },
   { name: 'Pillar', w: 1, h: 4, d: 1 },
   { name: 'Small', w: 1, h: 1, d: 1 },
+  { name: 'Ramp', w: 4, h: 2, d: 4, type: 'ramp' },
 ];
 
 interface UndoAction {
@@ -64,6 +66,7 @@ export class Editor {
 
   private raycaster = new THREE.Raycaster();
   private ghost: THREE.Mesh;
+  private rampGhost: THREE.Mesh;
   private marker: THREE.Group;
   private hoverBox: THREE.LineSegments;
   private selBox: THREE.LineSegments;
@@ -80,12 +83,13 @@ export class Editor {
     private input: Input,
     private camera: THREE.PerspectiveCamera,
   ) {
-    this.ghost = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshBasicMaterial({ color: PALETTE[0], transparent: true, opacity: 0.5, depthWrite: false }),
-    );
+    const ghostMat = () =>
+      new THREE.MeshBasicMaterial({ color: PALETTE[0], transparent: true, opacity: 0.5, depthWrite: false });
+    this.ghost = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), ghostMat());
+    this.rampGhost = new THREE.Mesh(rampGeometry(1, 1, 1), ghostMat());
     this.ghost.visible = false;
-    this.world.scene.add(this.ghost);
+    this.rampGhost.visible = false;
+    this.world.scene.add(this.ghost, this.rampGhost);
 
     this.hoverBox = this.makeOutline(0xffffff, 0.55);
     this.selBox = this.makeOutline(0x46e0ff, 1);
@@ -98,6 +102,9 @@ export class Editor {
 
   get currentColor(): number {
     return PALETTE[this.colorIndex]!;
+  }
+  get currentType(): 'ramp' | undefined {
+    return SHAPES[this.shapeIndex]!.type;
   }
   get canUndo(): boolean {
     return this.undoStack.length > 0;
@@ -125,7 +132,7 @@ export class Editor {
   }
 
   exit() {
-    this.ghost.visible = false;
+    this.hideGhost();
     this.marker.visible = false;
     this.hoverBox.visible = false;
     this.selBox.visible = false;
@@ -134,7 +141,7 @@ export class Editor {
 
   setInteractive(on: boolean) {
     this.active = on;
-    if (!on) this.ghost.visible = false;
+    if (!on) this.hideGhost();
   }
 
   // --- mode ----------------------------------------------------------------
@@ -143,7 +150,7 @@ export class Editor {
     this.selecting = on;
     this.moving = false;
     if (!on) this.deselect();
-    this.ghost.visible = false;
+    this.hideGhost();
     this.hoverBox.visible = false;
     this.onChange?.();
   }
@@ -361,7 +368,7 @@ export class Editor {
     const block = this.selectedBlock;
     const hit = this.raycastCenter();
     if (!block || !hit || !hit.face) {
-      this.ghost.visible = false;
+      this.hideGhost();
       return;
     }
     const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
@@ -370,26 +377,22 @@ export class Editor {
     const ew = swap ? block.d : block.w;
     const ed = swap ? block.w : block.d;
     this.placementCenter(hit.point, n, ew, block.h, ed, this.ghostCenter);
-    this.ghost.position.copy(this.ghostCenter);
-    this.ghost.scale.set(block.w, block.h, block.d);
-    this.ghost.rotation.set(0, rotY, 0);
-    (this.ghost.material as THREE.MeshBasicMaterial).color.setHex(block.color);
-    this.ghost.visible = true;
+    this.showGhost(block.type, block.w, block.h, block.d, rotY, block.color);
   }
 
   private commitMove() {
     const block = this.selectedBlock;
-    if (!block || !this.ghost.visible) return;
+    if (!block || !(this.ghost.visible || this.rampGhost.visible)) return;
     this.edit((b) => ({ ...b, x: this.ghostCenter.x, y: this.ghostCenter.y, z: this.ghostCenter.z }));
     this.moving = false;
-    this.ghost.visible = false;
+    this.hideGhost();
   }
 
   private updateGhost() {
     const hit = this.raycastCenter();
     this.hoverBlockId = hit ? (hit.object.userData.blockId as string | undefined) : undefined;
     if (!this.active || !hit || !hit.face) {
-      this.ghost.visible = false;
+      this.hideGhost();
       this.ghostValid = false;
       return;
     }
@@ -398,12 +401,24 @@ export class Editor {
     const ew = swap ? this.size.d : this.size.w;
     const ed = swap ? this.size.w : this.size.d;
     this.placementCenter(hit.point, n, ew, this.size.h, ed, this.ghostCenter);
-    this.ghost.position.copy(this.ghostCenter);
-    this.ghost.scale.set(this.size.w, this.size.h, this.size.d);
-    this.ghost.rotation.set(0, (this.yawSteps * Math.PI) / 2, 0);
-    (this.ghost.material as THREE.MeshBasicMaterial).color.setHex(this.currentColor);
-    this.ghost.visible = true;
+    this.showGhost(this.currentType, this.size.w, this.size.h, this.size.d, (this.yawSteps * Math.PI) / 2, this.currentColor);
     this.ghostValid = true;
+  }
+
+  private showGhost(type: 'ramp' | undefined, w: number, h: number, d: number, rotY: number, color: number) {
+    const g = type === 'ramp' ? this.rampGhost : this.ghost;
+    const other = type === 'ramp' ? this.ghost : this.rampGhost;
+    other.visible = false;
+    g.position.copy(this.ghostCenter);
+    g.scale.set(w, h, d);
+    g.rotation.set(0, rotY, 0);
+    (g.material as THREE.MeshBasicMaterial).color.setHex(color);
+    g.visible = true;
+  }
+
+  private hideGhost() {
+    this.ghost.visible = false;
+    this.rampGhost.visible = false;
   }
 
   private placePiece() {
@@ -418,6 +433,7 @@ export class Editor {
       color: this.currentColor,
     };
     if (this.yawSteps !== 0) block.rotation = [0, (this.yawSteps * Math.PI) / 2, 0];
+    if (this.currentType) block.type = this.currentType;
     this.world.addBlock(block);
     this.pushUndo({ added: [{ ...block }], removed: [] });
     this.persist();

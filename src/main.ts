@@ -356,7 +356,7 @@ async function main() {
       } else if (e.code === 'KeyZ' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         editor.undo();
-      } else if (!editor.selecting && /^Digit[1-5]$/.test(e.code)) {
+      } else if (!editor.selecting && /^Digit[1-6]$/.test(e.code)) {
         editor.setShapeIndex(Number(e.code.slice(5)) - 1);
       }
     } else if (mode === 'play') {

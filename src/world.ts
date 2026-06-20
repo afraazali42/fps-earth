@@ -55,9 +55,18 @@ export class World {
 
   /** Add one map block (visual mesh + physics collider), tracked by id. */
   addBlock(block: MapBlock): void {
+    const isRamp = block.type === 'ramp';
+    const geometry = isRamp
+      ? rampGeometry(block.w, block.h, block.d)
+      : new THREE.BoxGeometry(block.w, block.h, block.d);
     const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(block.w, block.h, block.d),
-      new THREE.MeshStandardMaterial({ color: block.color, roughness: 0.85 }),
+      geometry,
+      new THREE.MeshStandardMaterial({
+        color: block.color,
+        roughness: 0.85,
+        flatShading: isRamp,
+        side: isRamp ? THREE.DoubleSide : THREE.FrontSide,
+      }),
     );
     mesh.position.set(block.x, block.y, block.z);
     if (block.rotation) mesh.rotation.set(...block.rotation);
@@ -72,10 +81,11 @@ export class World {
       bodyDesc.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
     }
     const body = this.physics.createRigidBody(bodyDesc);
-    this.physics.createCollider(
-      RAPIER.ColliderDesc.cuboid(block.w / 2, block.h / 2, block.d / 2),
-      body,
-    );
+    const cuboid = RAPIER.ColliderDesc.cuboid(block.w / 2, block.h / 2, block.d / 2);
+    const colliderDesc = isRamp
+      ? RAPIER.ColliderDesc.convexHull(rampPoints(block.w, block.h, block.d)) ?? cuboid
+      : cuboid;
+    this.physics.createCollider(colliderDesc, body);
 
     this.blocks.set(block.id, { block, mesh, body });
   }
@@ -170,4 +180,37 @@ export class World {
     sun.shadow.camera.far = 180;
     this.scene.add(sun);
   }
+}
+
+/**
+ * A solid wedge (right-triangle prism) of bounding size w×h×d: flat bottom,
+ * vertical back at +z, sloped top rising from the −z (low) edge to the +z (high)
+ * edge. Walkable as a ramp; rotate it (yaw) to face any direction.
+ */
+export function rampGeometry(w: number, h: number, d: number): THREE.BufferGeometry {
+  const [x, y, z] = [w / 2, h / 2, d / 2];
+  const A = [-x, -y, -z]; // left  bottom front (low)
+  const B = [-x, -y, z]; //  left  bottom back
+  const C = [-x, y, z]; //   left  top back (high)
+  const D = [x, -y, -z]; //  right bottom front
+  const E = [x, -y, z]; //   right bottom back
+  const F = [x, y, z]; //    right top back
+  const tris = [
+    [A, B, C], [D, F, E], // triangular ends
+    [A, D, E], [A, E, B], // bottom
+    [B, E, F], [B, F, C], // vertical back
+    [A, C, F], [A, F, D], // slope
+  ];
+  const pos: number[] = [];
+  for (const t of tris) for (const v of t) pos.push(v[0]!, v[1]!, v[2]!);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** The 6 corner points of the wedge, for a convex-hull collider. */
+export function rampPoints(w: number, h: number, d: number): Float32Array {
+  const [x, y, z] = [w / 2, h / 2, d / 2];
+  return new Float32Array([-x, -y, -z, -x, -y, z, -x, y, z, x, -y, -z, x, -y, z, x, y, z]);
 }
