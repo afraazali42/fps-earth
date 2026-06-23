@@ -159,16 +159,17 @@ shows your local pins. Verified end to end (curl + browser): publish→code,
 re-publish→same code, cross-origin fetch (CORS), Share button→`6SH9TL`,
 Import `2ZN9U6`→map with its pin, load→geometry in world.
 
-**Honest limits now:** the directory is local-until-deployed (works on your machine
-+ same-network friends; a friend across the internet seeing your pins still needs
-the server deployed — same as the matchmaker); no accounts, so ownership is a
-device id (fine for a hobby directory, not griefer-proof); clicking a shared pin
-makes a fresh local copy each time (can duplicate if clicked repeatedly); stylised
-planet, not real imagery (Cesium/Google 3D tiles later); editor: ramp rotation is
-90° yaw, no multi-select yet.
+**Honest limits now:** *joining* works across the internet (signaling on the free
+public broker, Session 15) — but the *directory* is still local-until-deployed, so
+a friend seeing your **pins** needs `/api` hosted (online pins = a next bite); no
+accounts, so ownership is a device id (fine for a hobby directory, not griefer-
+proof); clicking a shared pin makes a fresh local copy each time (can duplicate if
+clicked repeatedly); stylised planet, not real imagery (Cesium/Google 3D tiles
+later); editor: ramp rotation is 90° yaw, no multi-select yet.
 
-**Not built yet:** multi-select/box-select, a deployed public server (works
-locally/LAN now), a TURN relay, accounts, a list/browse view of the directory
+**Not built yet:** the built game on a public static URL (so a friend with nothing
+installed can click a link — next bite), a deployed map directory (online pins), a
+TURN relay, accounts, multi-select/box-select, a list/browse view of the directory
 (the globe is the only browser right now).
 
 ## The plan (agreed 2026-06-09)
@@ -392,15 +393,29 @@ locally/LAN now), a TURN relay, accounts, a list/browse view of the directory
   + drop in. Fails soft if the server's down (offline blob code, local pins only).
   Verified end to end (curl API + browser CORS, Share/Import buttons, globe pins).
 
+### 2026-06-21 — Session 15: online joining via the free public broker
+- Signaling now **defaults to PeerJS's free public cloud** (`0.peerjs.com:443`), so
+  copies of the game anywhere can find each other and play P2P with **no server and
+  no accounts**. `?signal=host:port` still selects a self-hosted matchmaker (the
+  invite link carries `signal`/`api` along). **Decoupled the map directory** from
+  the signal config — it has its own base (`parseApiBase`, `?api=URL`, defaults to
+  local `:9000`), since signaling rides the cloud but the directory is our code.
+- Verified: host got a broker-assigned id + status "hosting" with **zero** peer
+  registrations on the local server (→ it used the cloud); directory still reachable
+  on `:9000`; `?signal=localhost:9000` override re-registers on the local server.
+- **Honest scope:** this makes *signaling* internet-ready. A friend still needs a
+  copy of the game to open the link — so the natural next bite is putting the built
+  game on a free **static** host (GitHub Pages — repo's already on GitHub) so a link
+  Just Works with nothing installed. Online *pins* still need the directory deployed.
+
 ### Next session — pick one
-- **A. Deploy the server** — put the matchmaker + map directory online so a friend
-  across the internet (not just same-network) can join AND see your globe pins.
-  This is what makes the shared globe truly shared. (Pairs with a TURN relay for
-  the few strict home networks.)
-- **B. A browse view + nicer drop-in** — a scrollable "shared maps" list (the globe
-  is the only browser today), de-dupe re-imported pins, and a literal fly-into-the-
-  pin transition instead of landing on the map's menu.
-- **C. Multi-select / box-select** — editor speed (grab many blocks at once).
-- **D. Game modes** — score-to-win, teams, the Halo-custom-games layer.
-- **E. Real Earth imagery** — swap the stylised planet for Cesium/Google 3D tiles
-  (research cost/terms first).
+- **A. Static-host the game (finish "click a link, play")** — `vite build` → GitHub
+  Pages (free, repo's already there): set Vite `base`, add a deploy workflow, share
+  one public URL. Then a friend with nothing installed clicks your link and joins.
+- **B. Deploy the map directory (online pins)** — put `/api` on a free, persistent,
+  always-on host (Cloudflare Worker + KV is the clean fit) so the globe shows other
+  people's pins across the internet and short codes work for everyone.
+- **C. A browse view + nicer drop-in** — a scrollable "shared maps" list (the globe
+  is the only browser today), de-dupe re-imported pins, fly-into-the-pin transition.
+- **D. Multi-select / box-select** — editor speed (grab many blocks at once).
+- **E. Game modes** — score-to-win, teams, the Halo-custom-games layer.

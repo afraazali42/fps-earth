@@ -17,15 +17,34 @@ import * as mapdir from './mapdir';
 
 const PHYSICS_STEP = 1 / 60; // physics runs at a fixed 60 Hz regardless of display refresh rate
 
-/** Where the signaling ("matchmaker") server lives. Defaults to this machine:9000. */
+/**
+ * Where the signaling ("matchmaker") broker lives — it just helps two browsers
+ * find each other. By DEFAULT we use PeerJS's free public cloud broker, so a
+ * friend in another house can join your link with no server to run or deploy.
+ * `?signal=host:port` points at a self-hosted matchmaker instead (e.g. your
+ * local `server/` for offline/LAN testing).
+ */
 function parseSignal(raw: string | null) {
-  const secure = location.protocol === 'https:';
-  const fallbackHost = location.hostname || 'localhost';
   if (raw) {
+    const secure = location.protocol === 'https:';
+    const fallbackHost = location.hostname || 'localhost';
     const [h, p] = raw.split(':');
     return { host: h || fallbackHost, port: p ? Number(p) : 9000, path: '/', secure };
   }
-  return { host: fallbackHost, port: 9000, path: '/', secure };
+  return { host: '0.peerjs.com', port: 443, path: '/', secure: true };
+}
+
+/**
+ * Where OUR own server (the map directory at `/api`) lives. This is separate
+ * from the signaling broker above: signaling can ride the public cloud, but the
+ * map directory is our code, so it defaults to the local server on :9000.
+ * `?api=URL` overrides it (e.g. a deployed directory later).
+ */
+function parseApiBase(raw: string | null): string {
+  if (raw) return raw.replace(/\/+$/, '');
+  const proto = location.protocol === 'https:' ? 'https' : 'http';
+  const host = location.hostname || 'localhost';
+  return `${proto}://${host}:9000`;
 }
 
 async function main() {
@@ -90,7 +109,7 @@ async function main() {
   const hostCode = params.get('host');
   const role: 'host' | 'peer' = hostCode ? 'peer' : 'host';
   const signal = parseSignal(params.get('signal'));
-  mapdir.configure(signal); // point the map directory at the same matchmaker host
+  mapdir.configure(parseApiBase(params.get('api'))); // our directory, not the broker
   const net = new Net(player, {
     role,
     hostCode: hostCode ?? undefined,
@@ -100,8 +119,16 @@ async function main() {
   });
   const remotes = new RemotePlayers(world);
 
-  const inviteLink = () =>
-    `${location.origin}${location.pathname}?host=${encodeURIComponent(net.shareCode)}`;
+  const inviteLink = () => {
+    const u = new URL(`${location.origin}${location.pathname}`);
+    u.searchParams.set('host', net.shareCode);
+    // carry a custom matchmaker / directory so the friend uses the same ones
+    const sig = params.get('signal');
+    const api = params.get('api');
+    if (sig) u.searchParams.set('signal', sig);
+    if (api) u.searchParams.set('api', api);
+    return u.toString();
+  };
   const updateNetUI = () => {
     if (net.role === 'host' && net.shareCode) {
       netstatusEl.innerHTML =

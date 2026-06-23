@@ -22,10 +22,9 @@ export interface DirEntry {
 
 let base = '/api';
 
-/** Point the client at the same host:port as the signaling server. */
-export function configure(signal: { host: string; port: number; secure: boolean }) {
-  const proto = signal.secure ? 'https' : 'http';
-  base = `${proto}://${signal.host}:${signal.port}/api`;
+/** Point the client at our server's base URL, e.g. `http://localhost:9000`. */
+export function configure(serverBase: string) {
+  base = serverBase.replace(/\/+$/, '') + '/api';
 }
 
 const DEVICE_KEY = 'fps-earth-device';

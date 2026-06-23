@@ -43,13 +43,20 @@ can also just press ▶ on the **dev** server in the preview panel.)
 
 - Open the game normally → **you're the host**. A shareable invite link appears
   (and a "Copy invite link" button).
-- A friend opens that link (`?host=CODE`) → their browser connects **directly**
-  to yours over WebRTC and the game plays peer-to-peer.
-- The only shared infrastructure is a tiny server (`server/`): a **matchmaker**
-  that helps browsers find each other (it carries no gameplay) plus a small **map
-  directory** (`/api`) that stores shared maps so they get short codes and appear
-  on the globe. Both run on one port, so it's still basically free to run.
-  `?signal=host:port` points the game at a specific server.
+- A friend opens that link (`?host=CODE`) on their own copy of the game → their
+  browser connects **directly** to yours over WebRTC and you play peer-to-peer.
+  Your map syncs to them on join, so they're playing *your* creation.
+- Finding each other uses PeerJS's **free public broker** by default — so **a
+  friend in another house can join with no server to run or deploy**. The broker
+  only does the handshake; it never sees gameplay.
+- To let a friend who has *nothing installed* just click a link, put the built
+  game on any free **static** host (the repo's on GitHub → GitHub Pages works),
+  then everyone loads that URL. That serves only files — still no game server.
+- Prefer your own matchmaker (offline/LAN, or a deployed one)? Start the bundled
+  `server/` and add `?signal=host:port` — the invite link carries it to your
+  friend automatically. That same server also hosts the **map directory** (`/api`)
+  behind the globe's short codes and shared pins (local for now; `?api=URL` points
+  at a deployed one).
 
 **Game rules (custom games):** the host gets a "Game rules" panel (in the menu,
 and any time via Esc) — gravity, move/sprint speed, jump height, damage, fire
