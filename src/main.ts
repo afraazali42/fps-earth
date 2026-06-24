@@ -315,6 +315,7 @@ async function main() {
 
   const refreshHud = () => {
     const sel = editor.selectedBlock;
+    const count = editor.selectionCount;
     const w = sel ? sel.w : editor.size.w;
     const h = sel ? sel.h : editor.size.h;
     const d = sel ? sel.d : editor.size.d;
@@ -332,9 +333,14 @@ async function main() {
 
     // hotbar info + hint reflect the mode
     if (editor.selecting) {
-      hbInfo.textContent = sel ? `selected · ${w}×${h}×${d}` : 'point at a block, click to select';
+      hbInfo.textContent =
+        count === 0
+          ? 'point at a block, click to select'
+          : count > 1
+            ? `${count} blocks selected`
+            : `selected · ${w}×${h}×${d}`;
       buildhintEl.innerHTML =
-        '<b>Select mode</b> — left-click a block, then <b>E</b> to edit · right-click deselect · <b>Tab</b> build · <b>Esc</b> pause';
+        '<b>Select mode</b> — click a block · <b>Shift-click</b> adds more · <b>E</b> edit · right-click clears · <b>Tab</b> build';
     } else {
       const rot = editor.rotationDeg ? `  ⟳${editor.rotationDeg}°` : '';
       hbInfo.textContent = `${editor.size.w}×${editor.size.h}×${editor.size.d}${rot}`;
@@ -342,11 +348,13 @@ async function main() {
         'Look with mouse · <b>left-click</b> place · <b>right-click</b> remove · <b>E</b> menu · <b>R</b> rotate · <b>Tab</b> select · <b>Esc</b> pause';
     }
 
-    // creation menu becomes an editor when a block is selected
-    const editing = !!sel;
-    cmTitle.textContent = editing ? 'Edit selected block' : 'Create';
+    // creation menu becomes an editor when one or more blocks are selected
+    const editing = count > 0;
+    cmTitle.textContent = editing ? (count > 1 ? `Edit ${count} blocks` : 'Edit selected block') : 'Create';
     cmSub.innerHTML = editing
-      ? 'Change colour, size or rotation — or move, duplicate, delete it.'
+      ? count > 1
+        ? 'Recolour, resize or rotate them all — or move, duplicate, delete together.'
+        : 'Change colour, size or rotation — or move, duplicate, delete it.'
       : 'Pick a shape, colour and size — press <b>E</b> to close and keep building.';
     cmShapeLabel.style.display = editing ? 'none' : '';
     cmShapesEl.style.display = editing ? 'none' : 'flex';

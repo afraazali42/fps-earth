@@ -60,8 +60,9 @@ export class Editor {
   yawSteps = 0;
   // select / edit
   selecting = false;
-  selectedId: string | undefined;
   moving = false;
+  private sel = new Set<string>();
+  private primary: string | undefined; // the menu's anchor block
 
   onChange: (() => void) | null = null;
 
@@ -70,7 +71,7 @@ export class Editor {
   private rampGhost: THREE.Mesh;
   private marker: THREE.Group;
   private hoverBox: THREE.LineSegments;
-  private selBox: THREE.LineSegments;
+  private selBoxes: THREE.LineSegments[] = []; // one outline per selected block
   private ghostValid = false;
   private ghostCenter = new THREE.Vector3();
   private hoverBlockId: string | undefined;
@@ -93,8 +94,7 @@ export class Editor {
     this.world.scene.add(this.ghost, this.rampGhost);
 
     this.hoverBox = this.makeOutline(0xffffff, 0.55);
-    this.selBox = this.makeOutline(0x46e0ff, 1);
-    this.world.scene.add(this.hoverBox, this.selBox);
+    this.world.scene.add(this.hoverBox);
 
     this.marker = this.buildMarker();
     this.marker.visible = false;
@@ -114,11 +114,21 @@ export class Editor {
     return this.yawSteps * 90;
   }
   get hasSelection(): boolean {
-    return this.selectedId !== undefined && this.world.getBlock(this.selectedId) !== undefined;
+    return this.sel.size > 0;
   }
-  /** A copy of the selected block's data (for the menu display). */
+  get selectionCount(): number {
+    return this.sel.size;
+  }
+  /** The "primary" block id — the menu's anchor (last one clicked). */
+  get selectedId(): string | undefined {
+    return this.primary;
+  }
+  selectionIds(): string[] {
+    return [...this.sel];
+  }
+  /** A copy of the primary selected block's data (for the menu display). */
   get selectedBlock(): MapBlock | undefined {
-    return this.selectedId ? this.world.getBlock(this.selectedId) : undefined;
+    return this.primary ? this.world.getBlock(this.primary) : undefined;
   }
 
   enter() {
@@ -136,7 +146,7 @@ export class Editor {
     this.hideGhost();
     this.marker.visible = false;
     this.hoverBox.visible = false;
-    this.selBox.visible = false;
+    this.hideSelBoxes();
     this.active = false;
   }
 
@@ -157,8 +167,9 @@ export class Editor {
   }
 
   deselect() {
-    this.selectedId = undefined;
-    this.selBox.visible = false;
+    this.sel.clear();
+    this.primary = undefined;
+    this.hideSelBoxes();
     this.moving = false;
     this.onChange?.();
   }
@@ -172,11 +183,11 @@ export class Editor {
     this.onChange?.();
   }
 
-  /** Colour: edits the selection if one is active, else the brush. */
+  /** Colour: edits the selection (all of it) if one is active, else the brush. */
   applyColor(i: number) {
     if (i < 0 || i >= PALETTE.length) return;
     if (this.hasSelection) {
-      this.edit((b) => ({ ...b, color: PALETTE[i]! }));
+      this.editSelection((b) => ({ ...b, color: PALETTE[i]! }));
     } else {
       this.colorIndex = i;
       this.onChange?.();
@@ -185,7 +196,7 @@ export class Editor {
 
   applySize(axis: 'w' | 'h' | 'd', delta: number) {
     if (this.hasSelection) {
-      this.edit((b) => ({ ...b, [axis]: clampSize(b[axis] + delta) }));
+      this.editSelection((b) => ({ ...b, [axis]: clampSize(b[axis] + delta) }));
     } else {
       this.size[axis] = clampSize(this.size[axis] + delta);
       this.onChange?.();
@@ -194,7 +205,7 @@ export class Editor {
 
   applyRotate() {
     if (this.hasSelection) {
-      this.edit((b) => {
+      this.editSelection((b) => {
         const cur = b.rotation ? b.rotation[1] : 0;
         const next = (Math.round(cur / (Math.PI / 2)) + 1) % 4;
         return { ...b, rotation: next === 0 ? undefined : [0, (next * Math.PI) / 2, 0] };
@@ -208,40 +219,75 @@ export class Editor {
   // --- edit the selected block ---------------------------------------------
 
   deleteSelection() {
-    const block = this.selectedBlock;
-    if (!block || block.locked) return;
-    this.world.removeBlock(block.id);
-    this.pushUndo({ added: [], removed: [{ ...block }] });
-    this.selectedId = undefined;
-    this.selBox.visible = false;
+    const removed: MapBlock[] = [];
+    for (const id of this.sel) {
+      const b = this.world.getBlock(id);
+      if (!b || b.locked) continue;
+      this.world.removeBlock(id);
+      removed.push({ ...b });
+    }
+    if (removed.length === 0) return;
+    this.pushUndo({ added: [], removed });
+    this.sel.clear();
+    this.primary = undefined;
+    this.hideSelBoxes();
     this.persist();
     this.onChange?.();
   }
 
   duplicateSelection() {
-    const block = this.selectedBlock;
-    if (!block) return;
-    const copy: MapBlock = { ...block, id: nextBlockId(), x: block.x + (block.w || 2) };
-    delete copy.locked;
-    this.world.addBlock(copy);
-    this.pushUndo({ added: [{ ...copy }], removed: [] });
-    this.selectedId = copy.id;
+    const blocks = this.selectionIds()
+      .map((id) => this.world.getBlock(id))
+      .filter((b): b is MapBlock => !!b);
+    if (blocks.length === 0) return;
+    // offset the copies just past the selection's right edge, so nothing overlaps
+    // and the whole group keeps its shape
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (const b of blocks) {
+      minX = Math.min(minX, b.x - b.w / 2);
+      maxX = Math.max(maxX, b.x + b.w / 2);
+    }
+    const dx = Math.max(2, maxX - minX);
+    const added: MapBlock[] = [];
+    const next = new Set<string>();
+    let last: string | undefined;
+    for (const b of blocks) {
+      const copy: MapBlock = { ...b, id: nextBlockId(), x: b.x + dx };
+      delete copy.locked;
+      this.world.addBlock(copy);
+      added.push({ ...copy });
+      next.add(copy.id);
+      last = copy.id;
+    }
+    this.pushUndo({ added, removed: [] });
+    this.sel = next;
+    this.primary = last;
+    this.refreshSelectionBox();
     this.persist();
     this.onChange?.();
   }
 
-  /** Begin moving the selected block — it follows the crosshair until you click. */
+  /** Begin moving the selection — it follows the crosshair (by its anchor) until you click. */
   startMove() {
     if (this.hasSelection) this.moving = true;
   }
 
-  private edit(change: (b: MapBlock) => MapBlock) {
-    const before = this.selectedBlock;
-    if (!before || before.locked) return;
-    const after = change({ ...before });
-    after.id = before.id;
-    this.world.replaceBlock(after);
-    this.pushUndo({ added: [{ ...after }], removed: [{ ...before }] });
+  /** Apply a change to EVERY selected block, batched into a single undo step. */
+  private editSelection(change: (b: MapBlock) => MapBlock) {
+    const added: MapBlock[] = [];
+    const removed: MapBlock[] = [];
+    for (const id of this.sel) {
+      const before = this.world.getBlock(id);
+      if (!before || before.locked) continue;
+      const after = change({ ...before });
+      after.id = before.id;
+      this.world.replaceBlock(after);
+      added.push({ ...after });
+      removed.push({ ...before });
+    }
+    if (added.length === 0) return;
+    this.pushUndo({ added, removed });
     this.persist();
     this.onChange?.();
   }
@@ -251,7 +297,7 @@ export class Editor {
     if (!action) return;
     for (const b of action.added) this.world.removeBlock(b.id);
     for (const b of action.removed) this.world.addBlock(b);
-    if (this.selectedId && !this.world.getBlock(this.selectedId)) this.selectedId = undefined;
+    this.pruneSelection();
     this.persist();
     this.onChange?.();
   }
@@ -261,7 +307,9 @@ export class Editor {
     if (removed.length === 0) return;
     for (const b of removed) this.world.removeBlock(b.id);
     this.pushUndo({ added: [], removed });
-    this.selectedId = undefined;
+    this.sel.clear();
+    this.primary = undefined;
+    this.hideSelBoxes();
     this.persist();
     this.onChange?.();
   }
@@ -286,7 +334,9 @@ export class Editor {
 
     const forward = (this.input.down('KeyW') ? 1 : 0) - (this.input.down('KeyS') ? 1 : 0);
     const strafe = (this.input.down('KeyD') ? 1 : 0) - (this.input.down('KeyA') ? 1 : 0);
-    const lift = (this.input.down('Space') ? 1 : 0) - (this.input.down('ShiftLeft') ? 1 : 0);
+    // in select mode, ShiftLeft means "add to selection", so don't also sink the camera
+    const sink = this.input.down('ShiftLeft') && !this.selecting ? 1 : 0;
+    const lift = (this.input.down('Space') ? 1 : 0) - sink;
     const speed = this.input.down('ShiftRight') ? FAST_FLY : FLY_SPEED;
     const move = new THREE.Vector3(strafe, 0, -forward);
     if (move.lengthSq() > 0) move.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
@@ -307,7 +357,7 @@ export class Editor {
       else if (click2) this.moving = false;
     } else if (this.selecting) {
       this.updateHover();
-      if (click0 && this.hoverBlockId) this.select(this.hoverBlockId);
+      if (click0 && this.hoverBlockId) this.clickSelect(this.hoverBlockId, this.input.down('ShiftLeft'));
       else if (click2) this.deselect();
     } else {
       this.updateGhost();
@@ -343,26 +393,67 @@ export class Editor {
     const id = hit ? (hit.object.userData.blockId as string | undefined) : undefined;
     const block = id ? this.world.getBlock(id) : undefined;
     this.hoverBlockId = block && !block.locked ? id : undefined;
-    if (this.hoverBlockId && this.hoverBlockId !== this.selectedId && block) {
+    if (this.hoverBlockId && !this.sel.has(this.hoverBlockId) && block) {
       this.placeOutline(this.hoverBox, block);
     } else {
       this.hoverBox.visible = false;
     }
   }
 
-  private select(id: string) {
-    this.selectedId = id;
+  /** Click a block in select mode: select only it, or (Shift) toggle it in the set. */
+  clickSelect(id: string, additive: boolean) {
+    const block = this.world.getBlock(id);
+    if (!block || block.locked) return;
+    if (additive) {
+      if (this.sel.has(id)) {
+        this.sel.delete(id);
+        if (this.primary === id) this.primary = this.lastOf(this.sel);
+      } else {
+        this.sel.add(id);
+        this.primary = id;
+      }
+    } else {
+      this.sel.clear();
+      this.sel.add(id);
+      this.primary = id;
+    }
     this.refreshSelectionBox();
     this.onChange?.();
   }
 
+  private pruneSelection() {
+    for (const id of [...this.sel]) if (!this.world.getBlock(id)) this.sel.delete(id);
+    if (this.primary && !this.world.getBlock(this.primary)) this.primary = this.lastOf(this.sel);
+  }
+
+  private lastOf(s: Set<string>): string | undefined {
+    let r: string | undefined;
+    for (const x of s) r = x;
+    return r;
+  }
+
   private refreshSelectionBox() {
-    const block = this.selectedBlock;
-    if (block) this.placeOutline(this.selBox, block);
-    else {
-      this.selBox.visible = false;
-      if (this.selectedId) this.selectedId = undefined;
+    this.pruneSelection();
+    let i = 0;
+    for (const id of this.sel) {
+      const block = this.world.getBlock(id);
+      if (block) this.placeOutline(this.getSelBox(i++), block);
     }
+    for (; i < this.selBoxes.length; i++) this.selBoxes[i]!.visible = false;
+  }
+
+  private getSelBox(i: number): THREE.LineSegments {
+    let box = this.selBoxes[i];
+    if (!box) {
+      box = this.makeOutline(0x46e0ff, 1);
+      this.selBoxes[i] = box;
+      this.world.scene.add(box);
+    }
+    return box;
+  }
+
+  private hideSelBoxes() {
+    for (const b of this.selBoxes) b.visible = false;
   }
 
   private updateMoveGhost() {
@@ -382,9 +473,13 @@ export class Editor {
   }
 
   private commitMove() {
-    const block = this.selectedBlock;
-    if (!block || !(this.ghost.visible || this.rampGhost.visible)) return;
-    this.edit((b) => ({ ...b, x: this.ghostCenter.x, y: this.ghostCenter.y, z: this.ghostCenter.z }));
+    const anchor = this.selectedBlock;
+    if (!anchor || !(this.ghost.visible || this.rampGhost.visible)) return;
+    // the anchor lands at the ghost; the rest of the selection shifts by the same delta
+    const dx = this.ghostCenter.x - anchor.x;
+    const dy = this.ghostCenter.y - anchor.y;
+    const dz = this.ghostCenter.z - anchor.z;
+    this.editSelection((b) => ({ ...b, x: b.x + dx, y: b.y + dy, z: b.z + dz }));
     this.moving = false;
     this.hideGhost();
   }

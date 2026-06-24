@@ -8,7 +8,7 @@ import type { RemotePlayers } from './remote';
 import type { World } from './world';
 import type { Editor } from './editor';
 import type { Globe } from './globe';
-import { nextBlockId } from './gamemap';
+import { nextBlockId, type MapBlock } from './gamemap';
 import * as mapstore from './mapstore';
 import * as mapdir from './mapdir';
 
@@ -97,6 +97,12 @@ export interface DevTools {
   clearMap(): number;
   setSelecting(on: boolean): void;
   selectedId(): string | undefined;
+  selectionCount(): number;
+  selectionIds(): string[];
+  selectMany(ids: string[]): void;
+  pick(id: string, additive: boolean): void;
+  recolorSel(i: number): void;
+  blocks(): MapBlock[];
   duplicateSel(): void;
   deleteSel(): void;
   // map library
@@ -353,6 +359,28 @@ export function installDevTools(
     },
     selectedId() {
       return editor.selectedId;
+    },
+    selectionCount() {
+      return editor.selectionCount;
+    },
+    selectionIds() {
+      return editor.selectionIds();
+    },
+    /** Select many blocks by id (test helper for multi-select). */
+    selectMany(ids: string[]) {
+      editor.deselect();
+      for (const id of ids) editor.clickSelect(id, true);
+    },
+    /** Mirror a real click: additive=false replaces, true Shift-toggles. */
+    pick(id: string, additive: boolean) {
+      editor.clickSelect(id, additive);
+    },
+    /** Recolour the whole selection (exercises the batched-edit path). */
+    recolorSel(i: number) {
+      editor.applyColor(i);
+    },
+    blocks() {
+      return world.getBlocks();
     },
     duplicateSel() {
       editor.duplicateSelection();

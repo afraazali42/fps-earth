@@ -408,6 +408,19 @@ TURN relay, accounts, multi-select/box-select, a list/browse view of the directo
   game on a free **static** host (GitHub Pages — repo's already on GitHub) so a link
   Just Works with nothing installed. Online *pins* still need the directory deployed.
 
+### 2026-06-23 — Session 16: editor multi-select
+- Generalised single-select into a **selection set** (`editor.ts`): single-click
+  selects one (unchanged), **Shift-click** accumulates/toggles, right-click clears.
+  Recolour/resize/rotate/move/duplicate/delete all act on the whole group, each as a
+  **single undo** (new `editSelection()` batches; outline pool draws one box per
+  block; group move shifts everything by the anchor's delta). HUD/menu show the
+  count ("N blocks selected", "Edit N blocks"). Shift doesn't sink the camera in
+  select mode. Dev: `selectMany/pick/recolorSel/blocks/selectionCount/selectionIds`.
+- Verified headless: count + single/shift/toggle/replace semantics; bulk recolor,
+  duplicate (+3), delete (−3), each one undo step; screenshot of 3-of-5 selected.
+- Also (Session 15 wrap, earlier today): `play.command` reinstalls deps when
+  package.json changes (express was added) — so updates don't break the launcher.
+
 ### Next session — pick one
 - **A. Static-host the game (finish "click a link, play")** — `vite build` → GitHub
   Pages (free, repo's already there): set Vite `base`, add a deploy workflow, share
@@ -415,7 +428,8 @@ TURN relay, accounts, multi-select/box-select, a list/browse view of the directo
 - **B. Deploy the map directory (online pins)** — put `/api` on a free, persistent,
   always-on host (Cloudflare Worker + KV is the clean fit) so the globe shows other
   people's pins across the internet and short codes work for everyone.
-- **C. A browse view + nicer drop-in** — a scrollable "shared maps" list (the globe
-  is the only browser today), de-dupe re-imported pins, fly-into-the-pin transition.
-- **D. Multi-select / box-select** — editor speed (grab many blocks at once).
-- **E. Game modes** — score-to-win, teams, the Halo-custom-games layer.
+- **C. More editor depth** — box/volume-select (drag a region), grouping, or
+  copy-paste between maps. Builds on the new selection set.
+- **D. Game modes** — score-to-win, teams, the Halo-custom-games layer.
+- **E. Scan-to-map rung 1** — import a scan as ghost "tracing paper" to build over
+  (the committed must-have; see memory). Bigger, but the most on-vision.

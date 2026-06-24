@@ -104,9 +104,12 @@ resizing it sets the slope, rotating aims it, and two ramps back-to-back make a
 peaked roof.
 
 **Select mode (Tab):** point the crosshair at a block and left-click to select it
-(it gets a cyan outline). The creation menu becomes an **"Edit selected block"**
-panel: **recolor**, **resize**, **rotate**, **duplicate**, **delete**, or **move**
-it (Move makes it follow the crosshair — click to drop). Right-click deselects.
+(it gets a cyan outline). **Shift-click** more blocks to grab a whole group at once
+(Shift-click a selected one to drop it back out); right-click clears the selection.
+The creation menu becomes an **"Edit selected block(s)"** panel that acts on
+**everything selected at once**: **recolor**, **resize**, **rotate**, **duplicate**,
+**delete**, or **move** them together (Move makes the group follow the crosshair by
+its anchor — click to drop). A whole group action is a single undo.
 
 Undo (Ctrl/Cmd-Z) covers everything; Clear wipes to a blank canvas.
 
