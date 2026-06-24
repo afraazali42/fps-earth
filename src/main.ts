@@ -340,7 +340,7 @@ async function main() {
             ? `${count} blocks selected`
             : `selected · ${w}×${h}×${d}`;
       buildhintEl.innerHTML =
-        '<b>Select mode</b> — click a block · <b>Shift-click</b> adds more · <b>E</b> edit · right-click clears · <b>Tab</b> build';
+        '<b>Select mode</b> — click a block · <b>drag</b> to box-select · <b>Shift</b> adds · <b>E</b> edit · right-click clears · <b>Tab</b> build';
     } else {
       const rot = editor.rotationDeg ? `  ⟳${editor.rotationDeg}°` : '';
       hbInfo.textContent = `${editor.size.w}×${editor.size.h}×${editor.size.d}${rot}`;

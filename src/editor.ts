@@ -38,6 +38,7 @@ const MAX_REACH = 120;
 const MAX_UNDO = 100;
 const MIN_SIZE = 0.5;
 const MAX_SIZE = 24;
+const BOX_DRAG_THRESHOLD = 40; // view-sweep (px) before a select-mode hold becomes a box
 const CENTER = new THREE.Vector2(0, 0);
 
 /**
@@ -63,6 +64,13 @@ export class Editor {
   moving = false;
   private sel = new Set<string>();
   private primary: string | undefined; // the menu's anchor block
+  // box-select (drag a region in select mode)
+  private boxing = false;
+  private boxStart = new THREE.Vector3();
+  private boxEnd = new THREE.Vector3();
+  private boxMoved = 0;
+  private lookMag = 0; // how much the view moved this frame (click-vs-drag test)
+  private previewBoxes: THREE.LineSegments[] = []; // outlines of would-be-selected blocks
 
   onChange: (() => void) | null = null;
 
@@ -72,6 +80,7 @@ export class Editor {
   private marker: THREE.Group;
   private hoverBox: THREE.LineSegments;
   private selBoxes: THREE.LineSegments[] = []; // one outline per selected block
+  private regionBox: THREE.Mesh; // the translucent footprint while box-selecting
   private ghostValid = false;
   private ghostCenter = new THREE.Vector3();
   private hoverBlockId: string | undefined;
@@ -95,6 +104,13 @@ export class Editor {
 
     this.hoverBox = this.makeOutline(0xffffff, 0.55);
     this.world.scene.add(this.hoverBox);
+
+    this.regionBox = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshBasicMaterial({ color: 0x46e0ff, transparent: true, opacity: 0.16, depthWrite: false }),
+    );
+    this.regionBox.visible = false;
+    this.world.scene.add(this.regionBox);
 
     this.marker = this.buildMarker();
     this.marker.visible = false;
@@ -147,6 +163,8 @@ export class Editor {
     this.marker.visible = false;
     this.hoverBox.visible = false;
     this.hideSelBoxes();
+    this.boxing = false;
+    this.hideBoxPreview();
     this.active = false;
   }
 
@@ -170,6 +188,8 @@ export class Editor {
     this.sel.clear();
     this.primary = undefined;
     this.hideSelBoxes();
+    this.boxing = false;
+    this.hideBoxPreview();
     this.moving = false;
     this.onChange?.();
   }
@@ -327,6 +347,7 @@ export class Editor {
   update(dt: number) {
     if (!this.active) return;
     const { dx, dy } = this.input.consumeMouse();
+    this.lookMag = Math.abs(dx) + Math.abs(dy);
     this.yaw -= dx * LOOK_SENSITIVITY;
     this.pitch -= dy * LOOK_SENSITIVITY;
     const limit = Math.PI / 2 - 0.02;
@@ -357,8 +378,39 @@ export class Editor {
       else if (click2) this.moving = false;
     } else if (this.selecting) {
       this.updateHover();
-      if (click0 && this.hoverBlockId) this.clickSelect(this.hoverBlockId, this.input.down('ShiftLeft'));
-      else if (click2) this.deselect();
+      const shift = this.input.down('ShiftLeft');
+      if (click0) {
+        // start a potential box from wherever the crosshair is pointing
+        const hit = this.raycastCenter();
+        this.boxing = !!hit;
+        if (hit) {
+          this.boxStart.copy(hit.point);
+          this.boxEnd.copy(hit.point);
+        }
+        this.boxMoved = 0;
+      } else if (this.boxing && m0) {
+        // holding: track how far the view swept and preview the region
+        this.boxMoved += this.lookMag;
+        const hit = this.raycastCenter();
+        if (hit) this.boxEnd.copy(hit.point);
+        if (this.boxMoved >= BOX_DRAG_THRESHOLD) {
+          this.hoverBox.visible = false;
+          this.showBoxPreview();
+        } else {
+          this.hideBoxPreview();
+        }
+      } else if (this.boxing && !m0) {
+        // release: a sweep box-selects the region, a tap selects one block
+        if (this.boxMoved >= BOX_DRAG_THRESHOLD) this.commitBox(shift);
+        else if (this.hoverBlockId) this.clickSelect(this.hoverBlockId, shift);
+        this.boxing = false;
+        this.hideBoxPreview();
+      }
+      if (click2) {
+        this.boxing = false;
+        this.hideBoxPreview();
+        this.deselect();
+      }
     } else {
       this.updateGhost();
       if (click0 && this.ghostValid) this.placePiece();
@@ -454,6 +506,76 @@ export class Editor {
 
   private hideSelBoxes() {
     for (const b of this.selBoxes) b.visible = false;
+  }
+
+  // --- box-select (drag a region in select mode) ---------------------------
+
+  /** Select every block whose centre falls in an X/Z footprint (test core too). */
+  selectRegion(x1: number, z1: number, x2: number, z2: number, additive: boolean) {
+    this.boxStart.set(x1, 0, z1);
+    this.boxEnd.set(x2, 0, z2);
+    this.commitBox(additive);
+  }
+
+  private boxBounds() {
+    return {
+      minX: Math.min(this.boxStart.x, this.boxEnd.x),
+      maxX: Math.max(this.boxStart.x, this.boxEnd.x),
+      minZ: Math.min(this.boxStart.z, this.boxEnd.z),
+      maxZ: Math.max(this.boxStart.z, this.boxEnd.z),
+    };
+  }
+
+  private boxCandidates(): string[] {
+    const { minX, maxX, minZ, maxZ } = this.boxBounds();
+    const out: string[] = [];
+    for (const b of this.world.getBlocks()) {
+      if (b.locked) continue;
+      if (b.x >= minX && b.x <= maxX && b.z >= minZ && b.z <= maxZ) out.push(b.id);
+    }
+    return out;
+  }
+
+  private showBoxPreview() {
+    const { minX, maxX, minZ, maxZ } = this.boxBounds();
+    this.regionBox.position.set((minX + maxX) / 2, this.boxStart.y + 0.05, (minZ + maxZ) / 2);
+    this.regionBox.scale.set(Math.max(0.1, maxX - minX), 0.1, Math.max(0.1, maxZ - minZ));
+    this.regionBox.visible = true;
+    let i = 0;
+    for (const id of this.boxCandidates()) {
+      const b = this.world.getBlock(id);
+      if (b) this.placeOutline(this.getPreviewBox(i++), b);
+    }
+    for (; i < this.previewBoxes.length; i++) this.previewBoxes[i]!.visible = false;
+  }
+
+  private hideBoxPreview() {
+    this.regionBox.visible = false;
+    for (const b of this.previewBoxes) b.visible = false;
+  }
+
+  private getPreviewBox(i: number): THREE.LineSegments {
+    let box = this.previewBoxes[i];
+    if (!box) {
+      box = this.makeOutline(0xffd24a, 0.9);
+      this.previewBoxes[i] = box;
+      this.world.scene.add(box);
+    }
+    return box;
+  }
+
+  private commitBox(additive: boolean) {
+    const ids = this.boxCandidates();
+    if (!additive) {
+      this.sel.clear();
+      this.primary = undefined;
+    }
+    for (const id of ids) {
+      this.sel.add(id);
+      this.primary = id;
+    }
+    this.refreshSelectionBox();
+    this.onChange?.();
   }
 
   private updateMoveGhost() {

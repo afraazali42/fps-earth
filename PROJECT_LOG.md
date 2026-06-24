@@ -421,6 +421,17 @@ TURN relay, accounts, multi-select/box-select, a list/browse view of the directo
 - Also (Session 15 wrap, earlier today): `play.command` reinstalls deps when
   package.json changes (express was added) — so updates don't break the launcher.
 
+### 2026-06-23 — Session 17: box-select (drag a region)
+- In Select mode, a quick click still picks one block, but **press-and-sweep drags
+  out a box** that selects every non-locked block whose centre is in the X/Z
+  footprint (Shift = add to the current selection). Click-vs-drag is decided by how
+  far the view swept (`BOX_DRAG_THRESHOLD`). Live preview: a translucent footprint
+  slab + yellow outlines on the would-be-selected blocks. `editor.selectRegion()` is
+  the shared core (+ `dev.boxSelect`). Pick now resolves on release (so a drag isn't
+  also a pick) — single-click behaviour is unchanged in feel.
+- Verified headless (4 in a cluster, +1 additive, 0 on empty-replace) + screenshot
+  (middle 4 of 8 box-selected, outer columns untouched).
+
 ### Next session — pick one
 - **A. Static-host the game (finish "click a link, play")** — `vite build` → GitHub
   Pages (free, repo's already there): set Vite `base`, add a deploy workflow, share
@@ -428,8 +439,8 @@ TURN relay, accounts, multi-select/box-select, a list/browse view of the directo
 - **B. Deploy the map directory (online pins)** — put `/api` on a free, persistent,
   always-on host (Cloudflare Worker + KV is the clean fit) so the globe shows other
   people's pins across the internet and short codes work for everyone.
-- **C. More editor depth** — box/volume-select (drag a region), grouping, or
-  copy-paste between maps. Builds on the new selection set.
+- **C. Editor: grouping / copy-paste** — save a selection as a reusable group, or
+  copy-paste blocks within and between maps. Builds on the selection set.
 - **D. Game modes** — score-to-win, teams, the Halo-custom-games layer.
 - **E. Scan-to-map rung 1** — import a scan as ghost "tracing paper" to build over
   (the committed must-have; see memory). Bigger, but the most on-vision.
