@@ -71,6 +71,12 @@ Guys, red Bad Guys, balanced automatically. No friendly fire, a shared team scor
 ("Good Guys 7 — Bad Guys 5"), and first team to the score limit wins the round.
 The naming is deliberately, cheerfully on-the-nose.
 
+**Capture the flag:** pick the **Capture the Flag** preset and each team gets a
+flag at its base. Grab the enemy flag, run it home (while *your* flag is still at
+base) to score a capture. Get killed carrying it and you drop it where you fell —
+a teammate can touch it to send it home, or another enemy can pick it up and keep
+running. First team to the capture limit wins.
+
 The host's browser runs the game's authority (health/hits/scores). Trade-offs,
 honest: the host has a latency advantage and could cheat, the game ends if the
 host leaves, and a small fraction of restrictive home networks need a relay

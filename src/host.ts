@@ -50,21 +50,51 @@ const BAD_SPAWNS = [
   { x: 14, y: 2, z: 18, yaw: -2.0, pitch: 0 },
 ];
 
+// capture-the-flag: each team defends a flag at its base, on opposite sides
+const FLAG_HOME = [
+  { x: -22, y: 0.2, z: 0 }, // the Good Guys' flag
+  { x: 22, y: 0.2, z: 0 }, // the Bad Guys' flag
+];
+const PICKUP_R2 = 3 * 3; // horizontal range to grab / return a flag
+const CAPTURE_R2 = 3.4 * 3.4; // range to your own base to score a capture
+const FLAG_RETURN_MS = 20000; // a dropped flag returns home after this long
+
+export interface FlagWire {
+  team: Team; // which team owns (defends) this flag
+  x: number;
+  y: number;
+  z: number;
+  carrier: string | null; // id of the enemy carrying it, else null
+  atHome: boolean;
+}
+
+interface FlagState extends FlagWire {
+  droppedAt: number;
+}
+
 export class GameHost {
   onBroadcast: ((list: NetPlayerWire[]) => void) | null = null;
   onKill: ((killerId: string, victimId: string) => void) | null = null;
   onRespawn: ((id: string, x: number, y: number, z: number) => void) | null = null;
   onTeamWin: ((team: Team) => void) | null = null;
+  onCapture: ((team: Team, byId: string) => void) | null = null;
+  onFlagTaken: ((team: Team, byId: string) => void) | null = null;
 
   private players = new Map<string, HostPlayerState>();
   private interval: ReturnType<typeof setInterval> | undefined;
   private teamKills: [number, number] = [0, 0]; // the round score (resets on a win)
+  private flags: FlagState[] = [];
 
-  constructor(private config: GameConfig) {}
+  constructor(private config: GameConfig) {
+    this.resetFlags();
+  }
 
   start() {
     if (this.interval !== undefined) return;
-    this.interval = setInterval(() => this.onBroadcast?.(this.list()), 1000 / BROADCAST_HZ);
+    this.interval = setInterval(() => {
+      if (this.config.teams.enabled && this.config.teams.mode === 'ctf') this.tickCtf();
+      this.onBroadcast?.(this.list());
+    }, 1000 / BROADCAST_HZ);
   }
 
   stop() {
@@ -132,15 +162,113 @@ export class GameHost {
       victim.deaths++;
       shooter.kills++;
       this.onKill?.(shooterId, parsed.target);
-      if (teams.enabled) {
-        this.teamKills[shooter.team]++;
-        if (teams.scoreToWin > 0 && this.teamKills[shooter.team] >= teams.scoreToWin) {
-          const winner = shooter.team;
-          this.teamKills = [0, 0]; // start the next round fresh
-          this.onTeamWin?.(winner);
-        }
-      }
+      this.dropFlagsHeldBy(parsed.target, victim); // a carrier drops the flag where they fell
+      // team deathmatch scores on kills; capture-the-flag scores on captures instead
+      if (teams.enabled && teams.mode !== 'ctf') this.addTeamScore(shooter.team);
       setTimeout(() => this.respawn(parsed.target), RESPAWN_SECONDS * 1000);
+    }
+  }
+
+  /** Add a point for a team (a kill in DM, a capture in CTF) and check for a win. */
+  private addTeamScore(team: Team) {
+    this.teamKills[team]++;
+    const t = this.config.teams;
+    if (t.scoreToWin > 0 && this.teamKills[team] >= t.scoreToWin) {
+      const winner = team;
+      this.teamKills = [0, 0]; // start the next round fresh
+      this.resetFlags();
+      this.onTeamWin?.(winner);
+    }
+  }
+
+  flagsWire(): FlagWire[] {
+    return this.flags.map((f) => ({
+      team: f.team,
+      x: f.x,
+      y: f.y,
+      z: f.z,
+      carrier: f.carrier,
+      atHome: f.atHome,
+    }));
+  }
+
+  private resetFlags() {
+    this.flags = FLAG_HOME.map((h, i) => ({
+      team: i as Team,
+      x: h.x,
+      y: h.y,
+      z: h.z,
+      carrier: null,
+      atHome: true,
+      droppedAt: 0,
+    }));
+  }
+
+  private returnFlag(team: Team) {
+    const h = FLAG_HOME[team]!;
+    const f = this.flags[team]!;
+    f.x = h.x;
+    f.y = h.y;
+    f.z = h.z;
+    f.carrier = null;
+    f.atHome = true;
+    f.droppedAt = 0;
+  }
+
+  private dropFlagsHeldBy(id: string, at: { x: number; y: number; z: number }) {
+    for (const f of this.flags) {
+      if (f.carrier === id) {
+        f.carrier = null;
+        f.atHome = false;
+        f.droppedAt = Date.now();
+        f.x = at.x;
+        f.y = at.y;
+        f.z = at.z;
+      }
+    }
+  }
+
+  /** One CTF step: carried flags follow their carrier, drops auto-return, and
+   * players near a flag pick it up / return it / score a capture. */
+  tickCtf() {
+    const now = Date.now();
+    for (const f of this.flags) {
+      if (f.carrier) {
+        const c = this.players.get(f.carrier);
+        if (c && c.alive) {
+          f.x = c.x;
+          f.y = c.y;
+          f.z = c.z;
+        } else {
+          f.carrier = null; // carrier left → drop where the flag was
+          f.atHome = false;
+          f.droppedAt = now;
+        }
+      } else if (!f.atHome && now - f.droppedAt > FLAG_RETURN_MS) {
+        this.returnFlag(f.team);
+      }
+    }
+    for (const [id, p] of this.players) {
+      if (!p.alive) continue;
+      const enemyFlag = this.flags[(1 - p.team) as Team]!;
+      const ownFlag = this.flags[p.team]!;
+      // capture: carry the enemy flag to your base while your own flag is home
+      if (enemyFlag.carrier === id && ownFlag.atHome && dist2(p, ownFlag) < CAPTURE_R2) {
+        this.returnFlag(enemyFlag.team);
+        this.onCapture?.(p.team, id);
+        this.addTeamScore(p.team);
+        continue;
+      }
+      // touch your own dropped flag to send it home
+      if (!ownFlag.atHome && ownFlag.carrier === null && dist2(p, ownFlag) < PICKUP_R2) {
+        this.returnFlag(ownFlag.team);
+      }
+      // grab the enemy flag (whether at home or lying dropped)
+      if (enemyFlag.carrier === null && dist2(p, enemyFlag) < PICKUP_R2) {
+        enemyFlag.carrier = id;
+        enemyFlag.atHome = false;
+        this.onFlagTaken?.(p.team, id);
+      }
     }
   }
 
@@ -167,6 +295,13 @@ export class GameHost {
 function spawnFor(team: Team) {
   const pool = team === 0 ? GOOD_SPAWNS : BAD_SPAWNS;
   return pool[Math.floor(Math.random() * pool.length)]!;
+}
+
+/** Horizontal (x/z) squared distance — flag pickups ignore height. */
+function dist2(a: { x: number; z: number }, b: { x: number; z: number }): number {
+  const dx = a.x - b.x;
+  const dz = a.z - b.z;
+  return dx * dx + dz * dz;
 }
 
 interface MoveData {

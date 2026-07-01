@@ -8,6 +8,7 @@ import { TargetManager } from './targets';
 import { Sfx } from './audio';
 import { Net } from './net';
 import { RemotePlayers } from './remote';
+import { Flags } from './flags';
 import { SettingsPanel } from './settings';
 import { Editor, PALETTE, SHAPES } from './editor';
 import { Globe } from './globe';
@@ -59,6 +60,7 @@ async function main() {
   const scoreEl = document.querySelector<HTMLDivElement>('#score')!;
   const teamscoreEl = document.querySelector<HTMLDivElement>('#teamscore')!;
   const teamwinEl = document.querySelector<HTMLDivElement>('#teamwin')!;
+  const flagstatusEl = document.querySelector<HTMLDivElement>('#flagstatus')!;
   const TEAM_NAMES = ['Good Guys', 'Bad Guys'];
   const TEAM_SINGULAR = ['Good Guy', 'Bad Guy'];
   const healthEl = document.querySelector<HTMLDivElement>('#health')!;
@@ -122,6 +124,7 @@ async function main() {
     getMap: () => world.toMap(),
   });
   const remotes = new RemotePlayers(world);
+  const flags = new Flags(world);
 
   const inviteLink = () => {
     const u = new URL(`${location.origin}${location.pathname}`);
@@ -718,6 +721,10 @@ async function main() {
     clearTimeout(teamwinTimer);
     teamwinTimer = setTimeout(() => teamwinEl.classList.remove('show'), 4500);
   };
+  net.onCapture = (team) => {
+    showKillFeed(`🚩 The ${TEAM_NAMES[team]} captured the flag!`);
+    sfx.kill();
+  };
 
   net.onRespawn = (id, x, y, z) => {
     // crisp local teleport on our own respawn; the dead flag clears in
@@ -786,6 +793,21 @@ async function main() {
   };
 
   const syncScore = () => {
+    // capture-the-flag: a line telling you the state of the flags
+    let flagMsg = '';
+    if (net.teams.enabled && config.teams.mode === 'ctf') {
+      const mine = net.myTeam();
+      if (mine !== undefined && net.flags.length === 2) {
+        const enemyFlag = net.flags[1 - mine]!;
+        const ownFlag = net.flags[mine]!;
+        if (enemyFlag.carrier === net.sessionId) flagMsg = '🚩 You have the enemy flag — run it home!';
+        else if (!ownFlag.atHome) flagMsg = 'Your flag is out — get it back!';
+        else if (enemyFlag.carrier) flagMsg = 'A teammate has the enemy flag!';
+      }
+    }
+    flagstatusEl.textContent = flagMsg;
+    flagstatusEl.classList.toggle('show', flagMsg !== '');
+
     if (net.teams.enabled) {
       const [good, bad] = net.teams.kills;
       const mine = net.myTeam();
@@ -813,6 +835,7 @@ async function main() {
     weapon.renderUpdate(0);
     reconcileLife();
     syncScore();
+    flags.update(net.flags, net.teams.enabled && config.teams.mode === 'ctf');
     renderer.render(world.scene, camera);
   };
 
@@ -826,6 +849,8 @@ async function main() {
     let dt = (now - last) / 1000;
     last = now;
     dt = Math.min(dt, 0.1); // returning from a background tab: don't fast-forward
+
+    flags.update(net.flags, mode === 'play' && net.teams.enabled && config.teams.mode === 'ctf');
 
     if (mode === 'globe') {
       globe.update(dt);

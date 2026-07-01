@@ -39,14 +39,17 @@ interface Preset {
     damage: number;
     fireRate: number;
   }>;
-  /** if set, also turns team deathmatch on/off */
+  /** if set, also turns team play on/off */
   teamsEnabled?: boolean;
+  /** if set, switches team mode: deathmatch or capture-the-flag */
+  mode?: 'dm' | 'ctf';
 }
 
 // each preset is a complete, coherent ruleset across the six knobs above
 const PRESETS: Preset[] = [
   { name: 'Normal', rules: { gravity: -24, walkSpeed: 5.5, sprintSpeed: 8.5, jumpVelocity: 8.5, damage: 25, fireRate: 8 }, teamsEnabled: false },
-  { name: 'Good vs Bad', rules: { gravity: -24, walkSpeed: 5.5, sprintSpeed: 8.5, jumpVelocity: 8.5, damage: 25, fireRate: 8 }, teamsEnabled: true },
+  { name: 'Good vs Bad', rules: { gravity: -24, walkSpeed: 5.5, sprintSpeed: 8.5, jumpVelocity: 8.5, damage: 25, fireRate: 8 }, teamsEnabled: true, mode: 'dm' },
+  { name: 'Capture the Flag', rules: { gravity: -24, walkSpeed: 5.5, sprintSpeed: 8.5, jumpVelocity: 8.5, damage: 25, fireRate: 8 }, teamsEnabled: true, mode: 'ctf' },
   { name: 'Moon', rules: { gravity: -5, walkSpeed: 5.5, sprintSpeed: 8.5, jumpVelocity: 8, damage: 25, fireRate: 8 } },
   { name: 'Snipers', rules: { gravity: -24, walkSpeed: 4.5, sprintSpeed: 7, jumpVelocity: 7, damage: 100, fireRate: 1.5 } },
   { name: 'Rapid Fire', rules: { gravity: -24, walkSpeed: 6, sprintSpeed: 9, jumpVelocity: 8.5, damage: 8, fireRate: 18 } },
@@ -170,6 +173,7 @@ export class SettingsPanel {
     if (r.damage !== undefined) c.weapon.damage = r.damage;
     if (r.fireRate !== undefined) c.weapon.fireRate = r.fireRate;
     if (preset.teamsEnabled !== undefined) c.teams.enabled = preset.teamsEnabled;
+    if (preset.mode !== undefined) c.teams.mode = preset.mode;
     this.refresh();
     this.onChange();
   }

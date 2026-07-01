@@ -86,6 +86,9 @@ export interface DevTools {
   hitBetween(shooterId: string, targetId: string, damage: number): void;
   teamState(): { kills: [number, number]; enabled: boolean };
   teamOf(id: string): 0 | 1 | undefined;
+  flags(): Net['flags'];
+  movePlayer(id: string, x: number, y: number, z: number): void;
+  tickCtf(): void;
   // map editor
   mode(): Mode;
   setMode(m: Mode): void;
@@ -314,10 +317,19 @@ export function installDevTools(
       netClient.debugHit(shooterId, targetId, damage);
     },
     teamState() {
-      return netClient.teams;
+      return netClient.debugTeams();
     },
     teamOf(id: string) {
       return netClient.players.find((p) => p.id === id)?.team;
+    },
+    flags() {
+      return netClient.debugFlags();
+    },
+    movePlayer(id: string, x: number, y: number, z: number) {
+      netClient.debugMove(id, x, y, z);
+    },
+    tickCtf() {
+      netClient.debugTickCtf();
     },
 
     // --- map editor -------------------------------------------------------

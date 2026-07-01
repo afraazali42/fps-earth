@@ -456,6 +456,21 @@ TURN relay, accounts, multi-select/box-select, a list/browse view of the directo
   balanced 2v2, friendly fire = no-op, enemy kill scores, reaching the limit wins +
   resets; screenshots of the rules panel, team-coloured capsules, and the team HUD.
 
+### 2026-06-23 — Session 20: capture the flag
+- Second game mode, on the team layer. `config.teams.mode: 'dm' | 'ctf'`. `host.ts`
+  owns a flag state machine: each team's flag has home/carried/dropped state; each
+  tick carried flags follow the carrier, drops auto-return after 20s, and players
+  near a flag **pick up** the enemy's / **return** their own / **capture** (bring
+  the enemy flag to your base while yours is home) → scores via the shared
+  `addTeamScore` (same win/reset as DM). Carriers **drop** the flag on death. New
+  `src/flags.ts` renders the two flags (pole + coloured cloth); net syncs `flags`
+  + a `capture` event. HUD: a flag-status line ("You have the enemy flag — run it
+  home!"), a "🚩 The Good Guys captured the flag!" feed, reused team score/banner.
+  Settings gets a **Capture the Flag** preset.
+- Verified headless (new dev hooks `flags`/`movePlayer`/`tickCtf` + authority reads
+  `debugFlags`/`debugTeams`): pickup, capture scores + returns the flag, win at the
+  limit + reset, drop-on-death drops where the carrier fell; screenshot of the flag.
+
 ### Next session — pick one
 - **A. Static-host the game (finish "click a link, play")** — `vite build` → GitHub
   Pages (free, repo's already there): set Vite `base`, add a deploy workflow, share
@@ -463,8 +478,8 @@ TURN relay, accounts, multi-select/box-select, a list/browse view of the directo
 - **B. Deploy the map directory (online pins)** — put `/api` on a free, persistent,
   always-on host (Cloudflare Worker + KV is the clean fit) so the globe shows other
   people's pins across the internet and short codes work for everyone.
-- **C. More game modes** — capture-the-flag, a round timer, team spawn-in-your-map,
-  or per-team colours you pick. Builds on the team layer just added.
+- **C. CTF/mode polish** — place flag bases in YOUR map (editor flag markers), a
+  round timer/scoreboard, or a capture sound. Deepens the modes just added.
 - **D. Editor: named groups / prefabs** — save a selection as a reusable, named piece
   you can stamp into any map (persisted). The clipboard is the in-session seed.
 - **E. Scan-to-map rung 1** — import a scan as ghost "tracing paper" to build over

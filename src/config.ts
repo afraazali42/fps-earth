@@ -30,9 +30,11 @@ export interface TargetsConfig {
 }
 
 export interface TeamConfig {
-  /** team deathmatch on/off — the Good Guys vs the Bad Guys */
+  /** team play on/off — the Good Guys vs the Bad Guys */
   enabled: boolean;
-  /** team kills to win a round (0 = play forever) */
+  /** 'dm' = team deathmatch (kills score), 'ctf' = capture the flag (captures score) */
+  mode: 'dm' | 'ctf';
+  /** kills (dm) or captures (ctf) to win a round (0 = play forever) */
   scoreToWin: number;
   /** can you damage your own team? (off makes teams mean something) */
   friendlyFire: boolean;
@@ -85,6 +87,7 @@ export function applyConfig(target: GameConfig, src: unknown): void {
   if (typeof s.teams === 'object' && s.teams !== null) {
     const tm = s.teams as Record<string, unknown>;
     if (typeof tm.enabled === 'boolean') target.teams.enabled = tm.enabled;
+    if (tm.mode === 'dm' || tm.mode === 'ctf') target.teams.mode = tm.mode;
     if (num(tm.scoreToWin)) target.teams.scoreToWin = tm.scoreToWin;
     if (typeof tm.friendlyFire === 'boolean') target.teams.friendlyFire = tm.friendlyFire;
   }
@@ -107,6 +110,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   },
   teams: {
     enabled: false,
+    mode: 'dm',
     scoreToWin: 25,
     friendlyFire: false,
   },

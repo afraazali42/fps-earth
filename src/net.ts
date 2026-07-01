@@ -1,5 +1,5 @@
 import type { Player } from './player';
-import { GameHost, type NetPlayerWire } from './host';
+import { GameHost, type NetPlayerWire, type FlagWire } from './host';
 import { PeerHost, PeerClient, type SignalConfig } from './peerlink';
 import { applyConfig, type GameConfig } from './config';
 import { parseMap, type GameMap } from './gamemap';
@@ -39,6 +39,8 @@ export class Net {
   players: NetPlayerState[] = [];
   /** team deathmatch round score, kept in sync with the host */
   teams: { kills: [number, number]; enabled: boolean } = { kills: [0, 0], enabled: false };
+  /** capture-the-flag flag state, kept in sync with the host */
+  flags: FlagWire[] = [];
 
   readonly role: Role;
   /** host: our peer id to share; peer: the host code we're joining */
@@ -48,6 +50,7 @@ export class Net {
   onKill: ((killerId: string, victimId: string) => void) | null = null;
   onRespawn: ((id: string, x: number, y: number, z: number) => void) | null = null;
   onTeamWin: ((team: 0 | 1) => void) | null = null;
+  onCapture: ((team: 0 | 1, byId: string) => void) | null = null;
   onStatus: ((status: string) => void) | null = null;
   /** peer: fired when the host's rules arrive and have been applied to config */
   onConfig: (() => void) | null = null;
@@ -86,6 +89,19 @@ export class Net {
   }
   debugHit(shooterId: string, targetId: string, damage: number) {
     if (this.role === 'host') this.game?.applyHit(shooterId, { target: targetId, damage });
+  }
+  debugMove(id: string, x: number, y: number, z: number) {
+    if (this.role === 'host') this.game?.applyMove(id, { x, y, z, yaw: 0, pitch: 0 });
+  }
+  debugTickCtf() {
+    if (this.role === 'host') this.game?.tickCtf();
+  }
+  /** Authoritative reads (host truth, no waiting for a broadcast tick). */
+  debugFlags(): FlagWire[] {
+    return this.role === 'host' ? (this.game?.flagsWire() ?? []) : this.flags;
+  }
+  debugTeams(): { kills: [number, number]; enabled: boolean } {
+    return this.role === 'host' ? (this.game?.teamState() ?? this.teams) : this.teams;
   }
 
   /** Host: push the current rules to everyone (call after changing settings). */
@@ -132,6 +148,10 @@ export class Net {
       this.teams = game.teamState();
       this.peerHost?.sendToAll('players', list);
       this.peerHost?.sendToAll('teams', this.teams);
+      if (this.opts.config.teams.mode === 'ctf') {
+        this.flags = game.flagsWire();
+        this.peerHost?.sendToAll('flags', this.flags);
+      }
     };
     game.onKill = (killer, victim) => {
       this.onKill?.(killer, victim);
@@ -140,6 +160,10 @@ export class Net {
     game.onTeamWin = (team) => {
       this.onTeamWin?.(team);
       this.peerHost?.sendToAll('teamwin', { team });
+    };
+    game.onCapture = (team, byId) => {
+      this.onCapture?.(team, byId);
+      this.peerHost?.sendToAll('capture', { team });
     };
     game.onRespawn = (id, x, y, z) => {
       this.onRespawn?.(id, x, y, z);
@@ -198,6 +222,11 @@ export class Net {
       } else if (type === 'teamwin') {
         const m = data as { team?: unknown };
         if (m.team === 0 || m.team === 1) this.onTeamWin?.(m.team);
+      } else if (type === 'flags') {
+        if (Array.isArray(data)) this.flags = data as FlagWire[];
+      } else if (type === 'capture') {
+        const m = data as { team?: unknown };
+        if (m.team === 0 || m.team === 1) this.onCapture?.(m.team, '');
       } else if (type === 'config') {
         applyConfig(this.opts.config, data);
         this.onConfig?.();
