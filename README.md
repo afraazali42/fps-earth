@@ -113,6 +113,10 @@ The creation menu becomes an **"Edit selected block(s)"** panel that acts on
 **delete**, or **move** them together (Move makes the group follow the crosshair by
 its anchor — click to drop). A whole group action is a single undo.
 
+**Copy-paste:** with something selected, **Ctrl/⌘-C** copies it and **Ctrl/⌘-V**
+stamps a copy at your crosshair — repeatedly, and even after you switch to a
+different map. The fast way to repeat a structure.
+
 Undo (Ctrl/Cmd-Z) covers everything; Clear wipes to a blank canvas.
 
 **Map library (📁 Maps in the menu):** keep many named maps, switch between them

@@ -64,6 +64,8 @@ export class Editor {
   moving = false;
   private sel = new Set<string>();
   private primary: string | undefined; // the menu's anchor block
+  // clipboard for copy/paste (survives map switches within a session)
+  private clipboard: { blocks: MapBlock[]; refX: number; refZ: number; baseY: number } | null = null;
   // box-select (drag a region in select mode)
   private boxing = false;
   private boxStart = new THREE.Vector3();
@@ -134,6 +136,12 @@ export class Editor {
   }
   get selectionCount(): number {
     return this.sel.size;
+  }
+  get canPaste(): boolean {
+    return this.clipboard !== null;
+  }
+  get clipboardCount(): number {
+    return this.clipboard ? this.clipboard.blocks.length : 0;
   }
   /** The "primary" block id — the menu's anchor (last one clicked). */
   get selectedId(): string | undefined {
@@ -280,6 +288,71 @@ export class Editor {
       next.add(copy.id);
       last = copy.id;
     }
+    this.pushUndo({ added, removed: [] });
+    this.sel = next;
+    this.primary = last;
+    this.refreshSelectionBox();
+    this.persist();
+    this.onChange?.();
+  }
+
+  /** Copy the current selection to the clipboard (relative to its base centre). */
+  copySelection() {
+    const blocks = this.selectionIds()
+      .map((id) => this.world.getBlock(id))
+      .filter((b): b is MapBlock => !!b && !b.locked)
+      .map(cloneBlock);
+    if (blocks.length === 0) return;
+    let sx = 0;
+    let sz = 0;
+    let baseY = Infinity;
+    for (const b of blocks) {
+      sx += b.x;
+      sz += b.z;
+      baseY = Math.min(baseY, b.y - b.h / 2);
+    }
+    this.clipboard = { blocks, refX: sx / blocks.length, refZ: sz / blocks.length, baseY };
+    this.onChange?.();
+  }
+
+  /** Paste at the crosshair (or, aiming at nothing, just beside where it was copied). */
+  paste() {
+    const c = this.clipboard;
+    if (!c) return;
+    const hit = this.raycastCenter();
+    if (hit) {
+      this.pasteAt(hit.point.x, hit.point.y, hit.point.z);
+    } else {
+      let minX = Infinity;
+      let maxX = -Infinity;
+      for (const b of c.blocks) {
+        minX = Math.min(minX, b.x - b.w / 2);
+        maxX = Math.max(maxX, b.x + b.w / 2);
+      }
+      this.pasteAt(c.refX + Math.max(2, maxX - minX), c.baseY, c.refZ);
+    }
+  }
+
+  /** Drop the clipboard so its base-centre lands at (x, y, z); selects the copies. */
+  pasteAt(x: number, y: number, z: number) {
+    const c = this.clipboard;
+    if (!c) return;
+    const added: MapBlock[] = [];
+    const next = new Set<string>();
+    let last: string | undefined;
+    for (const b of c.blocks) {
+      const nb = cloneBlock(b);
+      nb.id = nextBlockId();
+      nb.x = x + (b.x - c.refX);
+      nb.y = y + (b.y - c.baseY);
+      nb.z = z + (b.z - c.refZ);
+      delete nb.locked;
+      this.world.addBlock(nb);
+      added.push(cloneBlock(nb));
+      next.add(nb.id);
+      last = nb.id;
+    }
+    if (added.length === 0) return;
     this.pushUndo({ added, removed: [] });
     this.sel = next;
     this.primary = last;
@@ -739,4 +812,11 @@ export class Editor {
 
 function clampSize(v: number): number {
   return Math.max(MIN_SIZE, Math.min(MAX_SIZE, Math.round(v * 2) / 2));
+}
+
+/** A deep-ish copy of a block (clones the rotation array so copies stay independent). */
+function cloneBlock(b: MapBlock): MapBlock {
+  const c: MapBlock = { ...b };
+  if (b.rotation) c.rotation = [b.rotation[0]!, b.rotation[1]!, b.rotation[2]!];
+  return c;
 }

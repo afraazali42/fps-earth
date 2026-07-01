@@ -340,7 +340,7 @@ async function main() {
             ? `${count} blocks selected`
             : `selected · ${w}×${h}×${d}`;
       buildhintEl.innerHTML =
-        '<b>Select mode</b> — click a block · <b>drag</b> to box-select · <b>Shift</b> adds · <b>E</b> edit · right-click clears · <b>Tab</b> build';
+        '<b>Select mode</b> — click or <b>drag</b> to box-select · <b>Shift</b> adds · <b>Ctrl/⌘-C/V</b> copy·paste · <b>E</b> edit · right-click clears · <b>Tab</b> build';
     } else {
       const rot = editor.rotationDeg ? `  ⟳${editor.rotationDeg}°` : '';
       hbInfo.textContent = `${editor.size.w}×${editor.size.h}×${editor.size.d}${rot}`;
@@ -615,6 +615,12 @@ async function main() {
       } else if (e.code === 'KeyZ' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         editor.undo();
+      } else if (e.code === 'KeyC' && (e.metaKey || e.ctrlKey) && editor.hasSelection) {
+        e.preventDefault();
+        editor.copySelection();
+      } else if (e.code === 'KeyV' && (e.metaKey || e.ctrlKey) && editor.canPaste) {
+        e.preventDefault();
+        editor.paste();
       } else if (!editor.selecting && /^Digit[1-6]$/.test(e.code)) {
         editor.setShapeIndex(Number(e.code.slice(5)) - 1);
       }

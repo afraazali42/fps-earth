@@ -102,6 +102,9 @@ export interface DevTools {
   selectMany(ids: string[]): void;
   pick(id: string, additive: boolean): void;
   boxSelect(x1: number, z1: number, x2: number, z2: number, additive: boolean): void;
+  copySel(): void;
+  pasteAt(x: number, y: number, z: number): void;
+  clipboardCount(): number;
   recolorSel(i: number): void;
   blocks(): MapBlock[];
   duplicateSel(): void;
@@ -379,6 +382,15 @@ export function installDevTools(
     /** Box-select an X/Z footprint (what a drag does). */
     boxSelect(x1: number, z1: number, x2: number, z2: number, additive: boolean) {
       editor.selectRegion(x1, z1, x2, z2, additive);
+    },
+    copySel() {
+      editor.copySelection();
+    },
+    pasteAt(x: number, y: number, z: number) {
+      editor.pasteAt(x, y, z);
+    },
+    clipboardCount() {
+      return editor.clipboardCount;
     },
     /** Recolour the whole selection (exercises the batched-edit path). */
     recolorSel(i: number) {

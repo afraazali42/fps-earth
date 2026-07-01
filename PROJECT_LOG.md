@@ -432,6 +432,16 @@ TURN relay, accounts, multi-select/box-select, a list/browse view of the directo
 - Verified headless (4 in a cluster, +1 additive, 0 on empty-replace) + screenshot
   (middle 4 of 8 box-selected, outer columns untouched).
 
+### 2026-06-23 — Session 18: editor copy-paste
+- **Ctrl/⌘-C** copies the selection to an in-memory clipboard (block data stored
+  relative to the selection's base-centre); **Ctrl/⌘-V** stamps a copy at the
+  crosshair (base on the aimed surface), preserving the relative layout, selecting
+  the copies, one undo per paste. Clipboard **survives map switches** (copy in map A,
+  paste in map B). `editor.copySelection()/paste()/pasteAt()` + `cloneBlock()` (clones
+  the rotation array so copies stay independent). Dev: `copySel/pasteAt/clipboardCount`.
+- Verified headless (copy 3 → paste preserves 4×6 span, base on drop y, colours kept,
+  single undo; cross-map paste) + screenshot (original + identical pasted copy).
+
 ### Next session — pick one
 - **A. Static-host the game (finish "click a link, play")** — `vite build` → GitHub
   Pages (free, repo's already there): set Vite `base`, add a deploy workflow, share
@@ -439,8 +449,8 @@ TURN relay, accounts, multi-select/box-select, a list/browse view of the directo
 - **B. Deploy the map directory (online pins)** — put `/api` on a free, persistent,
   always-on host (Cloudflare Worker + KV is the clean fit) so the globe shows other
   people's pins across the internet and short codes work for everyone.
-- **C. Editor: grouping / copy-paste** — save a selection as a reusable group, or
-  copy-paste blocks within and between maps. Builds on the selection set.
+- **C. Editor: named groups / prefabs** — save a selection as a reusable, named piece
+  you can stamp into any map (persisted). The clipboard is the in-session seed of this.
 - **D. Game modes** — score-to-win, teams, the Halo-custom-games layer.
 - **E. Scan-to-map rung 1** — import a scan as ghost "tracing paper" to build over
   (the committed must-have; see memory). Bigger, but the most on-vision.
