@@ -7,6 +7,9 @@ import type { NetPlayerState } from './net';
 const CAPSULE_HALF_HEIGHT = 0.55;
 const CAPSULE_RADIUS = 0.35;
 
+// Good Guys blue, Bad Guys red (only used when team deathmatch is on)
+const TEAM_COLORS = [0x4a80ff, 0xe0473a];
+
 /**
  * Renders the other players AND gives each one a physics collider so the local
  * player's shots (and body) collide with them. A coloured capsule with a dark
@@ -26,7 +29,7 @@ export class RemotePlayers {
     return this.byHandle.get(handle);
   }
 
-  fixedUpdate(dt: number, players: NetPlayerState[], selfId: string) {
+  fixedUpdate(dt: number, players: NetPlayerState[], selfId: string, teamsEnabled = false) {
     const seen = new Set<string>();
 
     for (const p of players) {
@@ -41,6 +44,7 @@ export class RemotePlayers {
       }
       remote.target = p;
       remote.setAlive(p.alive);
+      remote.updateColor(teamsEnabled);
     }
 
     // remove players who left
@@ -67,14 +71,16 @@ class Remote {
   private yaw: number;
   private visor: THREE.Mesh;
   private alive = true;
+  private bodyMat: THREE.MeshStandardMaterial;
 
   constructor(world: World, initial: NetPlayerState) {
     this.target = initial;
     this.yaw = initial.yaw;
 
+    this.bodyMat = new THREE.MeshStandardMaterial({ color: colorFromId(initial.id), roughness: 0.7 });
     const body = new THREE.Mesh(
       new THREE.CapsuleGeometry(CAPSULE_RADIUS, CAPSULE_HALF_HEIGHT * 2, 6, 16),
-      new THREE.MeshStandardMaterial({ color: colorFromId(initial.id), roughness: 0.7 }),
+      this.bodyMat,
     );
     body.castShadow = true;
 
@@ -106,6 +112,12 @@ class Remote {
     this.alive = alive;
     this.group.visible = alive;
     this.collider.setEnabled(alive); // can't shoot a corpse
+  }
+
+  /** Team colour when team deathmatch is on, otherwise a stable per-id colour. */
+  updateColor(teamsEnabled: boolean) {
+    const hex = teamsEnabled ? TEAM_COLORS[this.target.team]! : colorFromId(this.target.id).getHex();
+    this.bodyMat.color.setHex(hex);
   }
 
   smooth(k: number) {

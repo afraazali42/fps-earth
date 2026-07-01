@@ -65,6 +65,12 @@ instantly and propagate to everyone in the lobby; peers see the rules read-only.
 This is the Halo-custom-games heart of the project, and it all rides on
 [src/config.ts](src/config.ts) (rules as data).
 
+**Team deathmatch — the Good Guys vs the Bad Guys:** flip on "Team deathmatch"
+(or the **Good vs Bad** preset) and everyone's split into two teams — blue Good
+Guys, red Bad Guys, balanced automatically. No friendly fire, a shared team score
+("Good Guys 7 — Bad Guys 5"), and first team to the score limit wins the round.
+The naming is deliberately, cheerfully on-the-nose.
+
 The host's browser runs the game's authority (health/hits/scores). Trade-offs,
 honest: the host has a latency advantage and could cheat, the game ends if the
 host leaves, and a small fraction of restrictive home networks need a relay

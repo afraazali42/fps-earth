@@ -29,6 +29,15 @@ export interface TargetsConfig {
   respawnSeconds: number;
 }
 
+export interface TeamConfig {
+  /** team deathmatch on/off — the Good Guys vs the Bad Guys */
+  enabled: boolean;
+  /** team kills to win a round (0 = play forever) */
+  scoreToWin: number;
+  /** can you damage your own team? (off makes teams mean something) */
+  friendlyFire: boolean;
+}
+
 export interface GameConfig {
   /** m/s², negative is down. Applies to players (and later, physics props). */
   gravity: number;
@@ -40,6 +49,7 @@ export interface GameConfig {
   jumpVelocity: number;
   weapon: WeaponConfig;
   targets: TargetsConfig;
+  teams: TeamConfig;
 }
 
 /**
@@ -71,6 +81,13 @@ export function applyConfig(target: GameConfig, src: unknown): void {
     if (num(t.health)) target.targets.health = t.health;
     if (num(t.respawnSeconds)) target.targets.respawnSeconds = t.respawnSeconds;
   }
+
+  if (typeof s.teams === 'object' && s.teams !== null) {
+    const tm = s.teams as Record<string, unknown>;
+    if (typeof tm.enabled === 'boolean') target.teams.enabled = tm.enabled;
+    if (num(tm.scoreToWin)) target.teams.scoreToWin = tm.scoreToWin;
+    if (typeof tm.friendlyFire === 'boolean') target.teams.friendlyFire = tm.friendlyFire;
+  }
 }
 
 export const DEFAULT_CONFIG: GameConfig = {
@@ -87,5 +104,10 @@ export const DEFAULT_CONFIG: GameConfig = {
   targets: {
     health: 100,
     respawnSeconds: 2,
+  },
+  teams: {
+    enabled: false,
+    scoreToWin: 25,
+    friendlyFire: false,
   },
 };

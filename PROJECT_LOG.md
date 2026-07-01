@@ -442,6 +442,20 @@ TURN relay, accounts, multi-select/box-select, a list/browse view of the directo
 - Verified headless (copy 3 → paste preserves 4×6 span, base on drop y, colours kept,
   single undo; cross-map paste) + screenshot (original + identical pasted copy).
 
+### 2026-06-23 — Session 19: team deathmatch (the Good Guys vs the Bad Guys)
+- First **game mode**. `config.teams {enabled, scoreToWin, friendlyFire}` (rules-as-
+  data). The host authority (`host.ts`) assigns balanced teams, spawns them on
+  opposite sides, blocks friendly fire, tracks an authoritative round score, and
+  fires a **win** (+ reset) at the score limit. Net syncs `teams` + a `teamwin`
+  event; peers get per-player `team`. Remotes render **blue Good Guys / red Bad
+  Guys**. HUD: a team score ("Good Guys 7 — Bad Guys 5", "you're a Good Guy"), a
+  "The Good Guys win!" banner, and a team-flavoured kill feed ("You got a Bad Guy").
+  Settings panel gets a **Team deathmatch** toggle, a **Score to win** slider, and a
+  **Good vs Bad** preset. On-the-nose naming, on purpose (user's idea).
+- Verified headless via new dev hooks (`addBot`/`hitBetween`/`teamState`/`teamOf`):
+  balanced 2v2, friendly fire = no-op, enemy kill scores, reaching the limit wins +
+  resets; screenshots of the rules panel, team-coloured capsules, and the team HUD.
+
 ### Next session — pick one
 - **A. Static-host the game (finish "click a link, play")** — `vite build` → GitHub
   Pages (free, repo's already there): set Vite `base`, add a deploy workflow, share
@@ -449,8 +463,9 @@ TURN relay, accounts, multi-select/box-select, a list/browse view of the directo
 - **B. Deploy the map directory (online pins)** — put `/api` on a free, persistent,
   always-on host (Cloudflare Worker + KV is the clean fit) so the globe shows other
   people's pins across the internet and short codes work for everyone.
-- **C. Editor: named groups / prefabs** — save a selection as a reusable, named piece
-  you can stamp into any map (persisted). The clipboard is the in-session seed of this.
-- **D. Game modes** — score-to-win, teams, the Halo-custom-games layer.
+- **C. More game modes** — capture-the-flag, a round timer, team spawn-in-your-map,
+  or per-team colours you pick. Builds on the team layer just added.
+- **D. Editor: named groups / prefabs** — save a selection as a reusable, named piece
+  you can stamp into any map (persisted). The clipboard is the in-session seed.
 - **E. Scan-to-map rung 1** — import a scan as ghost "tracing paper" to build over
   (the committed must-have; see memory). Bigger, but the most on-vision.

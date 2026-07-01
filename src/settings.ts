@@ -26,6 +26,7 @@ const KNOBS: Knob[] = [
   { label: 'Jump height', min: 4, max: 16, step: 0.5, get: (c) => c.jumpVelocity, set: (c, v) => (c.jumpVelocity = v), fmt: (v) => v.toFixed(1) },
   { label: 'Damage', min: 5, max: 100, step: 5, get: (c) => c.weapon.damage, set: (c, v) => (c.weapon.damage = v), fmt: (v) => v.toFixed(0) },
   { label: 'Fire rate', min: 1, max: 20, step: 0.5, get: (c) => c.weapon.fireRate, set: (c, v) => (c.weapon.fireRate = v), fmt: (v) => `${v.toFixed(1)}/s` },
+  { label: 'Score to win', min: 5, max: 50, step: 5, get: (c) => c.teams.scoreToWin, set: (c, v) => (c.teams.scoreToWin = v), fmt: (v) => `${v.toFixed(0)} kills` },
 ];
 
 interface Preset {
@@ -38,11 +39,14 @@ interface Preset {
     damage: number;
     fireRate: number;
   }>;
+  /** if set, also turns team deathmatch on/off */
+  teamsEnabled?: boolean;
 }
 
 // each preset is a complete, coherent ruleset across the six knobs above
 const PRESETS: Preset[] = [
-  { name: 'Normal', rules: { gravity: -24, walkSpeed: 5.5, sprintSpeed: 8.5, jumpVelocity: 8.5, damage: 25, fireRate: 8 } },
+  { name: 'Normal', rules: { gravity: -24, walkSpeed: 5.5, sprintSpeed: 8.5, jumpVelocity: 8.5, damage: 25, fireRate: 8 }, teamsEnabled: false },
+  { name: 'Good vs Bad', rules: { gravity: -24, walkSpeed: 5.5, sprintSpeed: 8.5, jumpVelocity: 8.5, damage: 25, fireRate: 8 }, teamsEnabled: true },
   { name: 'Moon', rules: { gravity: -5, walkSpeed: 5.5, sprintSpeed: 8.5, jumpVelocity: 8, damage: 25, fireRate: 8 } },
   { name: 'Snipers', rules: { gravity: -24, walkSpeed: 4.5, sprintSpeed: 7, jumpVelocity: 7, damage: 100, fireRate: 1.5 } },
   { name: 'Rapid Fire', rules: { gravity: -24, walkSpeed: 6, sprintSpeed: 9, jumpVelocity: 8.5, damage: 8, fireRate: 18 } },
@@ -53,6 +57,7 @@ const PRESETS: Preset[] = [
 export class SettingsPanel {
   private rows: { knob: Knob; input: HTMLInputElement; value: HTMLSpanElement }[] = [];
   private presetButtons: HTMLButtonElement[] = [];
+  private teamsToggle!: HTMLInputElement;
   private note: HTMLDivElement;
 
   constructor(
@@ -109,6 +114,25 @@ export class SettingsPanel {
       this.rows.push({ knob, input, value });
     }
 
+    // team deathmatch toggle — the on-the-nose Good Guys vs Bad Guys mode
+    const teamRow = document.createElement('label');
+    teamRow.className = 'knob';
+    const teamName = document.createElement('span');
+    teamName.className = 'knob-name';
+    teamName.textContent = 'Team deathmatch';
+    this.teamsToggle = document.createElement('input');
+    this.teamsToggle.type = 'checkbox';
+    this.teamsToggle.className = 'team-toggle';
+    const teamHint = document.createElement('span');
+    teamHint.className = 'knob-value';
+    teamHint.textContent = 'Good vs Bad';
+    this.teamsToggle.addEventListener('change', () => {
+      this.config.teams.enabled = this.teamsToggle.checked;
+      this.onChange();
+    });
+    teamRow.append(teamName, this.teamsToggle, teamHint);
+    container.appendChild(teamRow);
+
     this.note = document.createElement('div');
     this.note.className = 'settings-note';
     container.appendChild(this.note);
@@ -123,12 +147,14 @@ export class SettingsPanel {
       input.value = String(v);
       value.textContent = knob.fmt(v);
     }
+    this.teamsToggle.checked = this.config.teams.enabled;
   }
 
   /** Host can edit; peers see the rules but can't change them. */
   setEditable(editable: boolean) {
     for (const { input } of this.rows) input.disabled = !editable;
     for (const btn of this.presetButtons) btn.disabled = !editable;
+    this.teamsToggle.disabled = !editable;
     this.note.textContent = editable
       ? 'You set the rules — changes apply to everyone instantly.'
       : 'The host controls the rules for this game.';
@@ -143,6 +169,7 @@ export class SettingsPanel {
     if (r.jumpVelocity !== undefined) c.jumpVelocity = r.jumpVelocity;
     if (r.damage !== undefined) c.weapon.damage = r.damage;
     if (r.fireRate !== undefined) c.weapon.fireRate = r.fireRate;
+    if (preset.teamsEnabled !== undefined) c.teams.enabled = preset.teamsEnabled;
     this.refresh();
     this.onChange();
   }

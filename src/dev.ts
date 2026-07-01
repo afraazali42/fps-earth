@@ -81,6 +81,11 @@ export interface DevTools {
   self(): NetPlayerState | undefined;
   hitPlayer(targetId: string, damage?: number): void;
   broadcastRules(patch: Partial<GameConfig>): GameConfig;
+  // team deathmatch (drive the authority to test PvP/teams solo)
+  addBot(id: string): void;
+  hitBetween(shooterId: string, targetId: string, damage: number): void;
+  teamState(): { kills: [number, number]; enabled: boolean };
+  teamOf(id: string): 0 | 1 | undefined;
   // map editor
   mode(): Mode;
   setMode(m: Mode): void;
@@ -300,6 +305,19 @@ export function installDevTools(
       const updated = tools.tune(patch);
       netClient.broadcastConfig();
       return updated;
+    },
+
+    addBot(id: string) {
+      netClient.debugAddPlayer(id);
+    },
+    hitBetween(shooterId: string, targetId: string, damage: number) {
+      netClient.debugHit(shooterId, targetId, damage);
+    },
+    teamState() {
+      return netClient.teams;
+    },
+    teamOf(id: string) {
+      return netClient.players.find((p) => p.id === id)?.team;
     },
 
     // --- map editor -------------------------------------------------------

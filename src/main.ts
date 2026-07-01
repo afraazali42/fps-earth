@@ -57,6 +57,10 @@ async function main() {
   const hud = document.querySelector<HTMLDivElement>('#hud')!;
   const hitmarkerEl = document.querySelector<HTMLDivElement>('#hitmarker')!;
   const scoreEl = document.querySelector<HTMLDivElement>('#score')!;
+  const teamscoreEl = document.querySelector<HTMLDivElement>('#teamscore')!;
+  const teamwinEl = document.querySelector<HTMLDivElement>('#teamwin')!;
+  const TEAM_NAMES = ['Good Guys', 'Bad Guys'];
+  const TEAM_SINGULAR = ['Good Guy', 'Bad Guy'];
   const healthEl = document.querySelector<HTMLDivElement>('#health')!;
   const healthFill = document.querySelector<HTMLSpanElement>('#health .fill')!;
   const healthNum = document.querySelector<HTMLSpanElement>('#health .num')!;
@@ -678,16 +682,41 @@ async function main() {
     healthEl.classList.toggle('low', pct <= 30);
   };
 
+  // in team mode the kill feed talks in Good Guy / Bad Guy terms (old-Roblox charm)
+  const teamNameOf = (id: string) => {
+    const p = net.players.find((pp) => pp.id === id);
+    return p ? TEAM_SINGULAR[p.team] : 'someone';
+  };
+  const foe = (id: string) => (net.teams.enabled ? `a ${teamNameOf(id)}` : shortId(id));
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
   net.onKill = (killer, victim) => {
+    const teamy = net.teams.enabled;
     if (killer === net.sessionId) {
       ui.hitmarker(true);
       sfx.kill();
-      showKillFeed(`You eliminated ${shortId(victim)}`);
+      showKillFeed(teamy ? `You got ${foe(victim)}` : `You eliminated ${shortId(victim)}`);
     } else if (victim === net.sessionId) {
-      showKillFeed(`${shortId(killer)} eliminated you`);
+      showKillFeed(teamy ? `${cap(foe(killer))} got you` : `${shortId(killer)} eliminated you`);
     } else {
-      showKillFeed(`${shortId(killer)} eliminated ${shortId(victim)}`);
+      showKillFeed(
+        teamy
+          ? `${cap(foe(killer))} got ${foe(victim)}`
+          : `${shortId(killer)} eliminated ${shortId(victim)}`,
+      );
     }
+  };
+
+  let teamwinTimer: ReturnType<typeof setTimeout> | undefined;
+  const teamwinH2 = teamwinEl.querySelector('h2')!;
+  const teamwinSub = teamwinEl.querySelector('.sub')!;
+  net.onTeamWin = (team) => {
+    teamwinEl.className = team === 0 ? 'good show' : 'bad show';
+    teamwinH2.textContent = `The ${TEAM_NAMES[team]} win!`;
+    teamwinSub.textContent = 'Next round — go!';
+    sfx.kill();
+    clearTimeout(teamwinTimer);
+    teamwinTimer = setTimeout(() => teamwinEl.classList.remove('show'), 4500);
   };
 
   net.onRespawn = (id, x, y, z) => {
@@ -750,13 +779,30 @@ async function main() {
   const stepSimulation = (dt: number) => {
     if (!dead) player.fixedUpdate(dt);
     targets.fixedUpdate(dt);
-    remotes.fixedUpdate(dt, net.players, net.sessionId); // move remote colliders before the step
+    remotes.fixedUpdate(dt, net.players, net.sessionId, net.teams.enabled); // move remote colliders before the step
     world.physics.step();
     if (!dead) weapon.fixedUpdate(dt); // raycasts run against freshly stepped colliders
     net.fixedUpdate(dt);
   };
 
   const syncScore = () => {
+    if (net.teams.enabled) {
+      const [good, bad] = net.teams.kills;
+      const mine = net.myTeam();
+      const youLine =
+        mine === undefined
+          ? ''
+          : `<div class="you">you're a <span class="${mine === 0 ? 'good' : 'bad'}">${TEAM_SINGULAR[mine]}</span></div>`;
+      teamscoreEl.innerHTML =
+        `<div class="row"><span class="good">Good Guys ${good}</span>` +
+        `<span class="dash">—</span>` +
+        `<span class="bad">${bad} Bad Guys</span></div>${youLine}`;
+      teamscoreEl.classList.add('show');
+      scoreEl.style.display = 'none';
+      return;
+    }
+    teamscoreEl.classList.remove('show');
+    scoreEl.style.display = '';
     const me = net.self();
     scoreEl.textContent = me ? `☠ ${me.kills}   ⊗ ${me.deaths}` : `⌖ ${targets.kills}`;
   };

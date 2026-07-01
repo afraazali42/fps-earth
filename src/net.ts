@@ -37,6 +37,8 @@ export class Net {
   connected = false;
   sessionId = '';
   players: NetPlayerState[] = [];
+  /** team deathmatch round score, kept in sync with the host */
+  teams: { kills: [number, number]; enabled: boolean } = { kills: [0, 0], enabled: false };
 
   readonly role: Role;
   /** host: our peer id to share; peer: the host code we're joining */
@@ -45,6 +47,7 @@ export class Net {
 
   onKill: ((killerId: string, victimId: string) => void) | null = null;
   onRespawn: ((id: string, x: number, y: number, z: number) => void) | null = null;
+  onTeamWin: ((team: 0 | 1) => void) | null = null;
   onStatus: ((status: string) => void) | null = null;
   /** peer: fired when the host's rules arrive and have been applied to config */
   onConfig: (() => void) | null = null;
@@ -70,6 +73,19 @@ export class Net {
 
   self(): NetPlayerState | undefined {
     return this.players.find((p) => p.id === this.sessionId);
+  }
+
+  /** Which team we're on (0 = Good Guys, 1 = Bad Guys), if assigned yet. */
+  myTeam(): 0 | 1 | undefined {
+    return this.self()?.team;
+  }
+
+  // dev/test helpers (drive the authority directly to exercise PvP + teams)
+  debugAddPlayer(id: string) {
+    if (this.role === 'host') this.game?.addPlayer(id);
+  }
+  debugHit(shooterId: string, targetId: string, damage: number) {
+    if (this.role === 'host') this.game?.applyHit(shooterId, { target: targetId, damage });
   }
 
   /** Host: push the current rules to everyone (call after changing settings). */
@@ -108,16 +124,22 @@ export class Net {
 
   private startHost() {
     this.sessionId = HOST_ID;
-    const game = new GameHost();
+    const game = new GameHost(this.opts.config);
     this.game = game;
     game.addPlayer(HOST_ID);
     game.onBroadcast = (list) => {
       this.players = list;
+      this.teams = game.teamState();
       this.peerHost?.sendToAll('players', list);
+      this.peerHost?.sendToAll('teams', this.teams);
     };
     game.onKill = (killer, victim) => {
       this.onKill?.(killer, victim);
       this.peerHost?.sendToAll('kill', { killer, victim });
+    };
+    game.onTeamWin = (team) => {
+      this.onTeamWin?.(team);
+      this.peerHost?.sendToAll('teamwin', { team });
     };
     game.onRespawn = (id, x, y, z) => {
       this.onRespawn?.(id, x, y, z);
@@ -165,6 +187,17 @@ export class Net {
       } else if (type === 'respawn') {
         const m = data as { id: string; x: number; y: number; z: number };
         this.onRespawn?.(m.id, m.x, m.y, m.z);
+      } else if (type === 'teams') {
+        const m = data as { kills?: unknown; enabled?: unknown };
+        if (Array.isArray(m.kills) && m.kills.length === 2) {
+          this.teams = {
+            kills: [Number(m.kills[0]) || 0, Number(m.kills[1]) || 0],
+            enabled: !!m.enabled,
+          };
+        }
+      } else if (type === 'teamwin') {
+        const m = data as { team?: unknown };
+        if (m.team === 0 || m.team === 1) this.onTeamWin?.(m.team);
       } else if (type === 'config') {
         applyConfig(this.opts.config, data);
         this.onConfig?.();

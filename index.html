@@ -55,6 +55,31 @@
       text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
     }
 
+    #teamscore {
+      position: fixed; top: 9px; left: 50%; transform: translateX(-50%); z-index: 5;
+      display: none; flex-direction: column; align-items: center; gap: 1px;
+      font-family: system-ui, sans-serif; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+      white-space: nowrap; pointer-events: none;
+    }
+    #teamscore.show { display: flex; }
+    #teamscore .row { display: flex; align-items: center; gap: 14px; font-weight: 700; font-size: 22px; }
+    #teamscore .good { color: #74a3ff; }
+    #teamscore .bad { color: #ff7a6f; }
+    #teamscore .dash { color: rgba(255, 255, 255, 0.45); font-weight: 400; }
+    #teamscore .you { font-size: 12px; font-weight: 600; letter-spacing: 0.4px; opacity: 0.85; }
+
+    #teamwin {
+      position: fixed; inset: 0; z-index: 9; display: none;
+      flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+      background: rgba(0, 0, 0, 0.42); color: #fff; pointer-events: none; text-align: center;
+      font-family: system-ui, sans-serif;
+    }
+    #teamwin.show { display: flex; }
+    #teamwin h2 { margin: 0; font-size: 46px; letter-spacing: 3px; }
+    #teamwin .sub { opacity: 0.85; font-size: 15px; }
+    #teamwin.good h2 { color: #74a3ff; }
+    #teamwin.bad h2 { color: #ff7a6f; }
+
     #health {
       position: fixed; left: 16px; bottom: 30px; z-index: 5;
       display: flex; align-items: center; gap: 9px;
@@ -127,6 +152,7 @@
     }
     .knob-name { opacity: 0.85; }
     .knob input[type="range"] { width: 100%; accent-color: #5b8cff; cursor: pointer; }
+    .knob input[type="checkbox"] { width: 18px; height: 18px; accent-color: #5b8cff; cursor: pointer; justify-self: start; }
     .knob input:disabled { opacity: 0.5; cursor: default; }
     .knob-value { text-align: right; font-family: ui-monospace, monospace; color: #bcd0ff; }
     .settings-note { margin-top: 10px; font-size: 12px; opacity: 0.65; }
@@ -145,7 +171,7 @@
     }
     body.editing #buildhint { display: block; }
     body.editing #health, body.editing #score, body.editing #killfeed,
-    body.editing #hitmarker { display: none !important; }
+    body.editing #hitmarker, body.editing #teamscore { display: none !important; }
 
     /* hotbar — always visible while building; number keys 1–5 select */
     #hotbar {
@@ -276,9 +302,11 @@
   <div id="crosshair"></div>
   <div id="hitmarker">&#10005;</div>
   <div id="score">&#9760; 0</div>
+  <div id="teamscore"></div>
   <div id="killfeed"></div>
   <div id="health"><span class="bar"><span class="fill"></span></span><span class="num">100</span></div>
   <div id="death"><h2>ELIMINATED</h2><div class="sub">Respawning&hellip;</div></div>
+  <div id="teamwin"><h2></h2><div class="sub"></div></div>
   <div id="buildhint">Move mouse to look &middot; <b>left-click</b> place &middot; <b>right-click</b> remove &middot; <b>E</b> menu &middot; <b>R</b> rotate &middot; <b>Esc</b> pause</div>
   <div id="hotbar">
     <div id="slots"></div>
